@@ -99,6 +99,7 @@ target/
 
 # === PROJECT SPECIFIC ===
 plugins/
+!docs/plugins/
 world/*
 logs/
 
