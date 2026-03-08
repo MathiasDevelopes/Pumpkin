@@ -2,12 +2,14 @@
 
 ## The Event System
 
-Pumpkin's event system is inspired by the Bukkit event system but adapted for Rust's type system and async runtime. If you've used `@EventHandler` in Java, you'll find the concepts familiar.
+Events are the heart of Minecraft plugin development. When a player joins, breaks a block, or sends a chat message, the server fires an event — and your plugin can react to it.
 
-### Java vs Pumpkin Event Comparison
+Pumpkin's event system works very similarly to Bukkit's: you create a handler, register it, and your code runs whenever the event fires. The syntax is a bit different, but the concepts are the same.
+
+### Java vs Pumpkin: At a Glance
 
 ```java
-// Java (Bukkit)
+// Java (Bukkit) — annotate a method
 public class MyListener implements Listener {
     @EventHandler(priority = EventPriority.NORMAL)
     public void onPlayerJoin(PlayerJoinEvent event) {
@@ -20,12 +22,7 @@ getServer().getPluginManager().registerEvents(new MyListener(), this);
 ```
 
 ```rust
-// Rust (Pumpkin)
-use std::sync::Arc;
-use pumpkin::plugin::EventHandler;
-use pumpkin::plugin::api::events::player::PlayerJoinEvent;
-use pumpkin::server::Server;
-
+// Rust (Pumpkin) — implement a trait on a struct
 struct MyJoinHandler;
 
 impl EventHandler<PlayerJoinEvent> for MyJoinHandler {
@@ -33,7 +30,7 @@ impl EventHandler<PlayerJoinEvent> for MyJoinHandler {
         &'a self,
         _server: &'a Arc<Server>,
         event: &'a mut PlayerJoinEvent,
-    ) -> futures::future::BoxFuture<'a, ()> {
+    ) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             event.join_message = TextComponent::text(
                 format!("Welcome, {}!", event.player.gameprofile.name)
@@ -46,66 +43,28 @@ impl EventHandler<PlayerJoinEvent> for MyJoinHandler {
 server.register_event::<PlayerJoinEvent, _>(
     Arc::new(MyJoinHandler),
     EventPriority::Normal,
-    true, // blocking — we need to modify the event
+    true, // blocking — we want to modify the event
 ).await;
 ```
 
+The biggest difference: in Java you annotate a *method*, in Rust you implement a *trait* on a *struct*. The struct is your handler, and the trait method is where your logic goes.
+
+> **New to Rust?** The `<'a>` (called a "lifetime") and `BoxFuture` syntax might look scary. Don't worry about understanding them deeply right now — this is boilerplate that follows the same pattern every time. Think of it as the Rust equivalent of `@EventHandler public void ...`. Focus on the code inside `Box::pin(async move { ... })` — that's where your logic lives.
+
 ---
 
-## Core Concepts
+## Two Types of Handlers
 
-### The `Payload` Trait
+Pumpkin has a concept that doesn't exist in Bukkit: **blocking** vs **non-blocking** handlers.
 
-Every event in Pumpkin implements the `Payload` trait, which provides type identification and downcasting:
+### Non-Blocking Handlers (Read-Only)
 
-```rust
-pub trait Payload: Send + Sync {
-    fn get_name_static() -> &'static str where Self: Sized;
-    fn get_name(&self) -> &'static str;
-    fn as_any(&self) -> &dyn Any;
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-}
-```
-
-Events use name-based identification instead of `TypeId` to support safe cross-compilation boundary downcasting. You don't need to implement this manually — the `#[derive(Event)]` macro handles it.
-
-### The `EventHandler<E>` Trait
-
-This is what you implement to react to events:
+Use these when you just want to *observe* an event without changing it — like logging, analytics, or sending notifications:
 
 ```rust
-pub trait EventHandler<E: Payload>: Send + Sync {
-    /// Non-blocking handler — read-only access to the event
-    fn handle<'a>(
-        &'a self,
-        server: &'a Arc<Server>,
-        event: &'a E,
-    ) -> BoxFuture<'a, ()> {
-        Box::pin(async {})
-    }
+// Non-blocking: just log the event
+struct LogHandler;
 
-    /// Blocking handler — mutable access, can modify the event
-    fn handle_blocking<'a>(
-        &'a self,
-        server: &'a Arc<Server>,
-        event: &'a mut E,
-    ) -> BoxFuture<'a, ()> {
-        Box::pin(async {})
-    }
-}
-```
-
-### Blocking vs Non-Blocking Handlers
-
-This is a key distinction that doesn't exist in Bukkit:
-
-| Type | Access | Execution | Use When |
-|------|--------|-----------|----------|
-| **Non-blocking** (`handle`) | Read-only (`&E`) | Parallel with other non-blocking handlers | Logging, analytics, notifications |
-| **Blocking** (`handle_blocking`) | Mutable (`&mut E`) | Sequential, before non-blocking handlers | Modifying event data, cancelling events |
-
-```rust
-// Non-blocking: just log the event (read-only)
 impl EventHandler<PlayerJoinEvent> for LogHandler {
     fn handle<'a>(
         &'a self,
@@ -118,7 +77,24 @@ impl EventHandler<PlayerJoinEvent> for LogHandler {
     }
 }
 
-// Blocking: modify the join message (mutable)
+// Register as non-blocking
+server.register_event::<PlayerJoinEvent, _>(
+    Arc::new(LogHandler),
+    EventPriority::Normal,
+    false,  // non-blocking
+).await;
+```
+
+The key method is `handle` — notice that `event` is `&'a PlayerJoinEvent` (a read-only reference). Multiple non-blocking handlers run **in parallel** for better performance.
+
+### Blocking Handlers (Can Modify)
+
+Use these when you need to *change* the event — like modifying a chat message, cancelling block placement, or changing a join message:
+
+```rust
+// Blocking: modify the join message
+struct MessageHandler;
+
 impl EventHandler<PlayerJoinEvent> for MessageHandler {
     fn handle_blocking<'a>(
         &'a self,
@@ -130,66 +106,63 @@ impl EventHandler<PlayerJoinEvent> for MessageHandler {
         })
     }
 }
+
+// Register as blocking
+server.register_event::<PlayerJoinEvent, _>(
+    Arc::new(MessageHandler),
+    EventPriority::Normal,
+    true,  // blocking
+).await;
 ```
 
-#### Java Comparison
+The key method is `handle_blocking` — notice `event` is `&'a mut PlayerJoinEvent` (a mutable reference). Blocking handlers run **sequentially**, before non-blocking ones.
 
-In Bukkit, all handlers are effectively "blocking" — they run sequentially and can always modify the event. Pumpkin's split design allows better concurrency: read-only handlers can run in parallel, improving performance.
+| Handler Type | Method | Can Modify Event? | Execution |
+|-------------|--------|:-----------------:|-----------|
+| Non-blocking | `handle` | No (read-only) | Parallel — fast! |
+| Blocking | `handle_blocking` | Yes | Sequential — safe! |
+
+#### Why This Matters
+
+In Bukkit, all handlers run sequentially and can always modify the event. This is simple, but it means event handling can't take advantage of multiple CPU cores. Pumpkin's split design means read-only operations (logging, analytics) run in parallel, while modifications run safely one at a time. This gives you better server performance for free.
 
 ---
 
 ## Event Priority
 
-Priorities control the order handlers execute:
+Just like Bukkit, you can control the order handlers execute:
 
-```rust
-pub enum EventPriority {
-    Highest,  // Executes first
-    High,
-    Normal,   // Default
-    Low,
-    Lowest,   // Executes last — gets final say
-}
-```
+- **Highest** — Executes first
+- **High**
+- **Normal** — Default, good for most plugins
+- **Low**
+- **Lowest** — Executes last, gets the final say
 
-> **Important:** In Pumpkin, `Highest` runs **first** and `Lowest` runs **last**. This matches Bukkit's behavior where `LOWEST` has the "last word" on event modifications.
-
-### Registration with Priority
+> **Tip:** Use `Highest` or `High` for protection plugins that need to cancel events early. Use `Normal` for most plugins. Use `Low` or `Lowest` if you want to see the final state of the event after other plugins have modified it.
 
 ```rust
 // High priority — runs early, good for protection plugins
 server.register_event::<BlockBreakEvent, _>(
     Arc::new(ProtectionHandler),
     EventPriority::High,
-    true, // blocking
+    true,
 ).await;
 
 // Normal priority — default for most plugins
 server.register_event::<BlockBreakEvent, _>(
     Arc::new(LoggingHandler),
     EventPriority::Normal,
-    false, // non-blocking
+    false,
 ).await;
 ```
 
 ---
 
-## Cancellable Events
+## Cancelling Events
 
-Many events can be cancelled to prevent their default behavior, just like in Bukkit:
-
-```rust
-pub trait Cancellable: Send + Sync {
-    fn cancelled(&self) -> bool;
-    fn set_cancelled(&mut self, cancelled: bool);
-}
-```
-
-### Cancelling an Event
+Many events can be **cancelled** to prevent their default behavior. This works just like `event.setCancelled(true)` in Bukkit:
 
 ```rust
-use pumpkin::plugin::api::events::Cancellable;
-
 struct AntiGriefHandler;
 
 impl EventHandler<BlockBreakEvent> for AntiGriefHandler {
@@ -211,7 +184,6 @@ impl EventHandler<BlockBreakEvent> for AntiGriefHandler {
 #### Java Comparison
 
 ```java
-// Java
 @EventHandler
 public void onBlockBreak(BlockBreakEvent event) {
     if (isProtectedArea(event.getBlock().getLocation())) {
@@ -220,28 +192,21 @@ public void onBlockBreak(BlockBreakEvent event) {
 }
 ```
 
-### Checking if an Event was Cancelled
+You can also check if another plugin already cancelled an event:
 
 ```rust
-impl EventHandler<PlayerChatEvent> for ChatHandler {
-    fn handle_blocking<'a>(
-        &'a self,
-        _server: &'a Arc<Server>,
-        event: &'a mut PlayerChatEvent,
-    ) -> BoxFuture<'a, ()> {
-        Box::pin(async move {
-            if event.cancelled() {
-                return; // Another plugin already cancelled this
-            }
-            // Process the chat message
-        })
-    }
+if event.cancelled() {
+    return; // Another plugin already cancelled this
 }
 ```
+
+> **Note:** Only blocking handlers can cancel events, since cancellation requires modifying the event.
 
 ---
 
 ## Available Events
+
+Here's a reference of all events you can listen to:
 
 ### Player Events
 
@@ -295,7 +260,7 @@ impl EventHandler<PlayerChatEvent> for ChatHandler {
 
 ---
 
-## Event Examples
+## Practical Examples
 
 ### Example 1: Custom Join/Leave Messages
 
@@ -333,6 +298,8 @@ impl EventHandler<PlayerLeaveEvent> for JoinLeaveHandler {
 }
 ```
 
+> **Rust tip:** In Rust, a single struct can implement the same trait for different type parameters. Here, `JoinLeaveHandler` implements `EventHandler<PlayerJoinEvent>` *and* `EventHandler<PlayerLeaveEvent>`. This is like having a single Java class that handles multiple event types — but type-safe.
+
 ### Example 2: Chat Filter
 
 ```rust
@@ -351,7 +318,6 @@ impl EventHandler<PlayerChatEvent> for ChatFilter {
             for word in &self.blocked_words {
                 if msg_lower.contains(word) {
                     event.set_cancelled(true);
-                    // Optionally notify the player
                     return;
                 }
             }
@@ -359,7 +325,7 @@ impl EventHandler<PlayerChatEvent> for ChatFilter {
     }
 }
 
-// Registration
+// Registration — the struct holds its configuration
 let filter = Arc::new(ChatFilter {
     blocked_words: vec!["spam".into(), "badword".into()],
 });
@@ -370,11 +336,11 @@ server.register_event::<PlayerChatEvent, _>(
 ).await;
 ```
 
+> **Pattern:** Notice how the handler struct holds data (`blocked_words`). This is how you give your handlers configuration or shared state — similar to passing data to a Bukkit listener through constructor parameters.
+
 ### Example 3: Movement Tracker
 
 ```rust
-use pumpkin::plugin::api::events::player::PlayerMoveEvent;
-
 struct MovementTracker;
 
 impl EventHandler<PlayerMoveEvent> for MovementTracker {
@@ -400,11 +366,11 @@ impl EventHandler<PlayerMoveEvent> for MovementTracker {
 }
 ```
 
-### Example 4: Block Break with XP Drop Prevention
+This handler uses `handle` (non-blocking) because it only reads the event data. It doesn't need to modify or cancel anything, so it can run in parallel with other handlers.
+
+### Example 4: Prevent XP from Block Breaking
 
 ```rust
-use pumpkin::plugin::api::events::block::BlockBreakEvent;
-
 struct NoXpHandler;
 
 impl EventHandler<BlockBreakEvent> for NoXpHandler {
@@ -416,7 +382,7 @@ impl EventHandler<BlockBreakEvent> for NoXpHandler {
         Box::pin(async move {
             // Prevent XP from dropping when blocks are broken
             event.exp = 0;
-            // Or prevent item drops
+            // Or prevent item drops entirely:
             // event.drop = false;
         })
     }
@@ -432,21 +398,21 @@ You can register as many event handlers as you need in `on_load`:
 ```rust
 #[plugin_method]
 pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
-    // Register join handler
+    // Register join handler (blocking — modifies the message)
     server.register_event::<PlayerJoinEvent, _>(
         Arc::new(JoinHandler),
         EventPriority::Normal,
         true,
     ).await;
 
-    // Register chat handler
+    // Register chat handler (blocking — can cancel messages)
     server.register_event::<PlayerChatEvent, _>(
         Arc::new(ChatHandler),
         EventPriority::High,
         true,
     ).await;
 
-    // Register block handler (non-blocking, just logging)
+    // Register block handler (non-blocking — just logging)
     server.register_event::<BlockBreakEvent, _>(
         Arc::new(BlockLogHandler),
         EventPriority::Normal,

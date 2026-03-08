@@ -9,6 +9,8 @@
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
+   > **Coming from Java?** Rust's installer sets up everything you need in one step. There's no separate JDK, no JAVA_HOME environment variable, and no version managers to worry about. The `rustup` tool handles everything.
+
 2. **Verify your installation:**
    ```bash
    rustc --version   # Should be >= 1.94
@@ -22,7 +24,16 @@
    cargo build --release
    ```
 
-> **Java developers:** Think of `cargo` as a combination of Maven/Gradle and `javac`. It manages dependencies, compiles code, and runs tests — all in one tool.
+### What is Cargo?
+
+If you've used Maven or Gradle in Java, **Cargo** is Rust's equivalent — but it does even more. It's your:
+
+- **Build tool** — compiles your code (`cargo build`)
+- **Package manager** — downloads dependencies automatically
+- **Test runner** — runs your tests (`cargo test`)
+- **Project scaffolder** — creates new projects (`cargo new`)
+
+All from a single command-line tool. No XML configuration files, no plugin repositories to configure.
 
 ---
 
@@ -35,11 +46,11 @@ cargo new --lib my_first_plugin
 cd my_first_plugin
 ```
 
-This creates a library crate (not a binary), similar to creating a new Maven project for a plugin.
+This creates a library project (not a standalone program), similar to creating a new Maven project for a Bukkit plugin.
 
 ### Step 2: Configure `Cargo.toml`
 
-Replace the contents of `Cargo.toml` with:
+Open `Cargo.toml` — this is your project's configuration file, similar to Java's `pom.xml` or `build.gradle` combined with `plugin.yml`. Replace its contents with:
 
 ```toml
 [package]
@@ -50,18 +61,22 @@ description = "My first Pumpkin plugin"
 edition = "2024"
 
 [lib]
-crate-type = ["cdylib"]  # Compile as a dynamic library
+crate-type = ["cdylib"]  # Compile as a native library the server can load
 
 [dependencies]
 pumpkin = { path = "../Pumpkin/pumpkin" }        # Core server API
 pumpkin-api-macros = { path = "../Pumpkin/pumpkin-api-macros" }  # Plugin macros
 ```
 
-> **Important:** The `crate-type = ["cdylib"]` tells Cargo to produce a C-compatible dynamic library (`.so`/`.dll`/`.dylib`). This is what the Pumpkin server loads at runtime.
+A few things to note:
+
+- The `[package]` section is like your `plugin.yml` — it defines your plugin's name, version, and description. Pumpkin reads this metadata automatically.
+- `crate-type = ["cdylib"]` tells Rust to compile your code into a dynamic library that Pumpkin can load at runtime, similar to how the JVM loads `.jar` files.
+- The `[dependencies]` section is like Maven dependencies — Cargo downloads and links them automatically.
 
 #### Java Comparison
 
-In Java, your `plugin.yml` defines the metadata:
+In Java, you'd have a separate `plugin.yml` for metadata:
 
 ```yaml
 # Java: plugin.yml
@@ -72,7 +87,7 @@ author: Your Name
 description: My first plugin
 ```
 
-In Pumpkin, `Cargo.toml` serves this purpose — the `#[plugin_impl]` macro automatically reads the `[package]` fields and exports them as your plugin's metadata.
+In Pumpkin, `Cargo.toml` serves both purposes. Less files, less configuration.
 
 ### Step 3: Write the Plugin
 
@@ -84,22 +99,22 @@ use std::sync::Arc;
 use pumpkin::plugin::api::context::Context;
 use pumpkin_api_macros::{plugin_impl, plugin_method};
 
-/// The main plugin struct. Annotate with #[plugin_impl] to generate
-/// all the required boilerplate (metadata, API version, factory function).
+// The #[plugin_impl] macro sets up everything the server needs
+// to load your plugin — metadata, version checks, and initialization.
+// Think of it as the Rust equivalent of "extends JavaPlugin".
 #[plugin_impl]
 pub struct MyFirstPlugin;
 
 impl MyFirstPlugin {
-    /// Called when the plugin is loaded by the server.
-    /// Similar to JavaPlugin.onEnable()
+    // #[plugin_method] marks this as a plugin lifecycle method.
+    // on_load is called when the server starts — like onEnable() in Bukkit.
     #[plugin_method]
     pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
         server.log("Hello from MyFirstPlugin! 🎃");
         Ok(())
     }
 
-    /// Called when the plugin is unloaded.
-    /// Similar to JavaPlugin.onDisable()
+    // on_unload is called when the server stops — like onDisable() in Bukkit.
     #[plugin_method]
     pub fn on_unload(&mut self, server: Arc<Context>) -> Result<(), String> {
         server.log("Goodbye from MyFirstPlugin!");
@@ -107,6 +122,15 @@ impl MyFirstPlugin {
     }
 }
 ```
+
+Let's break down the new Rust syntax:
+
+- **`use` statements** — Like Java `import` statements. They bring types into scope.
+- **`pub struct MyFirstPlugin;`** — Declares your plugin. A struct in Rust is similar to a Java class, but without inheritance. The `pub` makes it visible outside this file.
+- **`impl MyFirstPlugin`** — This is where you define methods on your struct, similar to writing methods inside a Java class body.
+- **`&mut self`** — This means the method can modify the plugin's data. In Java terms, it's like a regular instance method. (You'll learn more about `&self` vs `&mut self` later.)
+- **`Arc<Context>`** — The server context, passed to you on load. `Arc` means it's a shared reference that's safe to use across threads. Don't worry about the details — just use it like you'd use `this.getServer()` in Bukkit.
+- **`Result<(), String>`** — The method returns either success (`Ok(())`) or an error (`Err("message")`). This is how Rust handles errors instead of throwing exceptions.
 
 ### Step 4: Build the Plugin
 
@@ -118,6 +142,8 @@ Your compiled plugin will be at:
 - **Linux:** `target/release/libmy_first_plugin.so`
 - **macOS:** `target/release/libmy_first_plugin.dylib`
 - **Windows:** `target/release/my_first_plugin.dll`
+
+> **Tip:** The first build downloads dependencies and takes a bit longer. Subsequent builds are much faster since Cargo caches everything.
 
 ### Step 5: Install and Run
 
@@ -138,74 +164,25 @@ You should see your plugin's message in the server console:
 [MyFirstPlugin] Hello from MyFirstPlugin! 🎃
 ```
 
----
-
-## Understanding `#[plugin_impl]`
-
-The `#[plugin_impl]` macro does a lot of heavy lifting. Here's what it generates behind the scenes:
-
-```rust
-// What you write:
-#[plugin_impl]
-pub struct MyFirstPlugin;
-
-// What the macro generates:
-#[no_mangle]
-pub static METADATA: PluginMetadata<'static> = PluginMetadata {
-    name: "my-first-plugin",        // From Cargo.toml [package].name
-    version: "0.1.0",               // From Cargo.toml [package].version
-    authors: "Your Name",           // From Cargo.toml [package].authors
-    description: "My first plugin", // From Cargo.toml [package].description
-};
-
-#[no_mangle]
-pub static PUMPKIN_API_VERSION: u32 = 2; // Current API version
-
-#[no_mangle]
-pub fn plugin() -> Box<dyn Plugin> {
-    Box::new(MyFirstPlugin)
-}
-
-impl Plugin for MyFirstPlugin {
-    fn on_load(&mut self, server: Arc<Context>) -> PluginFuture<'_, Result<(), String>> {
-        // Your on_load code, wrapped in async
-    }
-    fn on_unload(&mut self, server: Arc<Context>) -> PluginFuture<'_, Result<(), String>> {
-        // Your on_unload code, wrapped in async
-    }
-}
-```
-
-This is analogous to how Bukkit reads your `plugin.yml` and uses reflection to instantiate your main class — except Pumpkin does it at the binary level through exported symbols.
+🎉 Congratulations — you've just built and loaded your first Pumpkin plugin!
 
 ---
 
-## Understanding `#[plugin_method]`
+## What Do the Macros Do?
 
-The `#[plugin_method]` attribute wraps your method to return a `PluginFuture`. This lets you write straightforward synchronous-looking code that's actually async under the hood:
+You might be curious about what `#[plugin_impl]` and `#[plugin_method]` actually do behind the scenes. The short answer: they generate the boilerplate code that Pumpkin needs to load your plugin.
 
-```rust
-// What you write:
-#[plugin_method]
-pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
-    server.log("Hello!");
-    Ok(())
-}
+- **`#[plugin_impl]`** reads your `Cargo.toml` and generates the plugin metadata (name, version, authors, description) plus a factory function that the server calls to create your plugin instance. Without this macro, you'd need to write several `#[no_mangle]` functions manually.
 
-// What it becomes:
-pub fn on_load(&mut self, server: Arc<Context>) -> PluginFuture<'_, Result<(), String>> {
-    Box::pin(async move {
-        server.log("Hello!");
-        Ok(())
-    })
-}
-```
+- **`#[plugin_method]`** wraps your method so it works with Pumpkin's async system. You write normal-looking code, and the macro makes it compatible with the server's async runtime.
+
+You don't need to understand the generated code to use these macros effectively. If you're curious, you can explore the details later in [Stage 9: Advanced Topics](09-advanced-topics.md).
 
 ---
 
 ## Plugin Data Folder
 
-Every plugin gets its own data directory, similar to `JavaPlugin.getDataFolder()`:
+Every plugin gets its own data directory, just like `JavaPlugin.getDataFolder()`:
 
 ```rust
 #[plugin_method]
@@ -216,6 +193,8 @@ pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
     Ok(())
 }
 ```
+
+This is where you'd store configuration files, player data, or any other files your plugin needs.
 
 ---
 
@@ -229,14 +208,14 @@ pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
     // Initialize the logger (optional, enables structured logging)
     server.init_log();
 
-    // Simple log message (prefixed with plugin name)
+    // Simple log message (automatically prefixed with your plugin name)
     server.log("Plugin loaded successfully!");
     server.log(format!("Running version {}", env!("CARGO_PKG_VERSION")));
     Ok(())
 }
 ```
 
-### Java Comparison
+#### Java Comparison
 
 ```java
 // Java
@@ -273,7 +252,7 @@ crate-type = ["cdylib"]
 
 ## What's Next?
 
-In [Stage 3: Plugin Lifecycle](03-plugin-lifecycle.md), we'll dive deeper into the `Plugin` trait, the `Context` API, and how to manage your plugin's state.
+In [Stage 3: Plugin Lifecycle](03-plugin-lifecycle.md), we'll explore what you can do with the `Context` API — finding players, registering events, managing plugin state, and more.
 
 ---
 

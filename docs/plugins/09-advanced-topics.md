@@ -1,5 +1,7 @@
 # Stage 9: Advanced Topics
 
+> **Note:** This stage covers more advanced patterns. If you're new to Rust, you may want to build a few simpler plugins first (using events and commands from Stages 4–5) before diving in here. These topics are here for when you need them.
+
 ## Services: Inter-Plugin Communication
 
 Pumpkin's service system allows plugins to expose functionality to other plugins, similar to Bukkit's `ServicesManager`. This is how you build plugin APIs — for example, an economy plugin can expose a service that other plugins use for transactions.
@@ -83,23 +85,10 @@ double balance = economy.getBalance(player);
 
 Pumpkin's plugin system is extensible — you can register custom loaders for plugins written in languages other than Rust (e.g., Lua, JavaScript, WASM).
 
-### The `PluginLoader` Trait
-
-```rust
-pub trait PluginLoader: Send + Sync {
-    /// Load a plugin from the given path
-    fn load<'a>(&'a self, path: &'a Path) -> PluginLoadFuture<'a>;
-
-    /// Check if this loader can handle the given file
-    fn can_load(&self, path: &Path) -> bool;
-
-    /// Unload a previously loaded plugin
-    fn unload(&self, data: Box<dyn Any + Send + Sync>) -> PluginUnloadFuture<'_>;
-
-    /// Whether this loader supports unloading
-    fn can_unload(&self) -> bool;
-}
-```
+A custom loader needs to tell Pumpkin:
+- **What files it can handle** (e.g., `.lua` files)
+- **How to load them** (parse the file, create a Plugin wrapper)
+- **How to unload them** (clean up resources)
 
 ### Implementing a Custom Loader
 
@@ -223,6 +212,8 @@ match timeout(Duration::from_secs(5), some_async_operation()).await {
 
 ### Channels for Communication
 
+Channels allow different parts of your plugin to communicate asynchronously — similar to Java's `BlockingQueue` but designed for async code:
+
 ```rust
 use tokio::sync::mpsc;
 
@@ -245,11 +236,14 @@ tokio::spawn(async move {
 
 ## Configuration Files
 
-Pumpkin uses TOML for configuration. Here's how to manage plugin configuration:
+Pumpkin uses TOML for configuration (instead of YAML). The `serde` library handles converting between Rust structs and config files — you define your config as a struct, and serde does the rest:
 
 ```rust
 use serde::{Deserialize, Serialize};
 
+// The #[derive(Serialize, Deserialize)] macros automatically generate
+// code to convert this struct to/from TOML. It's like Jackson in Java,
+// but happens at compile time instead of runtime.
 #[derive(Serialize, Deserialize)]
 struct PluginConfig {
     welcome_message: String,

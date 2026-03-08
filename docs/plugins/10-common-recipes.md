@@ -1,6 +1,8 @@
 # Stage 10: Common Recipes
 
-This chapter provides ready-to-use Pumpkin plugin patterns translated from popular Java (Bukkit/Spigot/Paper) examples. Each recipe shows the Java version side-by-side with the Pumpkin equivalent.
+This chapter provides ready-to-use Pumpkin plugin patterns translated from popular Java (Bukkit/Spigot/Paper) examples. Each recipe shows the Java version side-by-side with the Pumpkin equivalent, so you can see exactly how to port your existing plugin ideas.
+
+> **Tip:** These recipes combine concepts from earlier stages. If something looks unfamiliar, check the referenced stage for a detailed explanation.
 
 ---
 
@@ -34,6 +36,8 @@ public class AnnouncerPlugin extends JavaPlugin {
 ```
 
 ### Pumpkin
+
+In Rust, we use Tokio's async tasks instead of Bukkit's scheduler. The `tokio::select!` macro lets us wait for either the timer or a shutdown signal — whichever comes first:
 
 ```rust
 use std::sync::Arc;
@@ -587,23 +591,32 @@ impl JoinCounterPlugin {
 
 ## What's Next?
 
-Congratulations! You've completed the Pumpkin Plugin Development Guide. You now have the knowledge to build plugins ranging from simple utilities to complex systems.
+Congratulations! 🎃 You've completed the Pumpkin Plugin Development Guide.
+
+You now have the knowledge to build plugins ranging from simple utilities to complex systems. Remember:
+
+- **Start small** — Begin with a `/ping` command or a join message, then add complexity gradually
+- **Let the compiler help you** — Rust's compiler error messages are detailed and helpful. When something doesn't compile, read the error carefully — it usually tells you exactly how to fix it
+- **Don't fight the borrow checker** — If the compiler is stopping you from doing something, there's usually a good reason. It's protecting you from bugs that would be painful to debug at runtime
+- **It gets easier** — The `Arc`, `RwLock`, and lifetime syntax might feel verbose at first, but it quickly becomes muscle memory. After a few plugins, you'll write it without thinking
+- **You don't need to learn all of Rust** — You can build great plugins knowing just the concepts covered in this guide. Learn more as you need it
 
 ### Resources
 
 - [Pumpkin Repository](https://github.com/Snowiiii/Pumpkin) — Source code and issues
 - [Pumpkin Documentation](https://pumpkinmc.org/) — Official docs
 - [Pumpkin Discord](https://discord.gg/pumpkinmc) — Community and support
-- [The Rust Book](https://doc.rust-lang.org/book/) — Learn Rust
-- [Tokio Tutorial](https://tokio.rs/tokio/tutorial) — Learn async Rust
+- [The Rust Book](https://doc.rust-lang.org/book/) — The official Rust tutorial (free)
+- [Rust by Example](https://doc.rust-lang.org/rust-by-example/) — Learn through hands-on examples
+- [Tokio Tutorial](https://tokio.rs/tokio/tutorial) — Learn async Rust (Pumpkin's async runtime)
+- [Rustlings](https://github.com/rust-lang/rustlings) — Small exercises to practice Rust basics
 
-### Tips for Success
+### Need Help?
 
-1. **Start small** — Begin with a simple event handler, then build up
-2. **Use the compiler** — Rust's compiler catches most bugs before they happen
-3. **Embrace async** — `async`/`await` is central to Pumpkin; learn it well
-4. **Read the source** — Pumpkin's codebase is well-organized and readable
-5. **Join the community** — The Discord is active and welcoming
+1. **Read the Rust compiler errors** — They're usually very clear and suggest fixes
+2. **Check the Pumpkin source code** — The codebase is well-organized and the existing commands/plugins serve as great examples
+3. **Ask in the Discord** — The community is active and welcoming
+4. **Refer back to this guide** — Use the [cheat sheet above](#quick-reference-java--pumpkin-cheat-sheet) for quick Java→Rust translations
 
 ---
 

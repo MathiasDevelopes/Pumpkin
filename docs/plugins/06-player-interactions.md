@@ -2,33 +2,26 @@
 
 ## Working with Players
 
-In Bukkit, you interact with players through the `Player` interface. In Pumpkin, players are represented by `Arc<Player>` — a thread-safe reference-counted pointer to the player object.
+In Bukkit, you interact with players through the `Player` interface. In Pumpkin, players are represented by `Arc<Player>` — but you interact with them in very similar ways.
 
 ### Getting Player References
 
+You can get a player reference from different contexts:
+
 ```rust
-// From the Context (by name)
+// From the Context (by name) — like Bukkit.getPlayer("Steve")
 if let Some(player) = server.get_player_by_name("Steve") {
     // Use player...
 }
 
-// From an event
-impl EventHandler<PlayerJoinEvent> for MyHandler {
-    fn handle<'a>(
-        &'a self,
-        _server: &'a Arc<Server>,
-        event: &'a PlayerJoinEvent,
-    ) -> BoxFuture<'a, ()> {
-        Box::pin(async move {
-            let player = &event.player; // Arc<Player>
-            let name = &player.gameprofile.name;
-        })
-    }
-}
+// From an event — the player is part of the event data
+// (inside a handler)
+let player = &event.player;
+let name = &player.gameprofile.name;
 
-// From a CommandSender
+// From a CommandSender — check if the sender is a player
 if let Some(player) = sender.as_player() {
-    // player is Arc<Player>
+    // player is the Player object
 }
 ```
 
@@ -101,18 +94,20 @@ Bukkit.broadcastMessage("§eServer announcement!");
 
 ### Game Profile
 
+Every player has a game profile with their name and UUID:
+
 ```rust
-// Player name
+// Player name — like player.getName() in Java
 let name = &player.gameprofile.name;
 
-// Player UUID
+// Player UUID — like player.getUniqueId() in Java
 let uuid = &player.gameprofile.id;
 ```
 
 ### Position and World
 
 ```rust
-// Get player's position
+// Get player's position — like player.getLocation() in Java
 let position = player.living_entity.entity.pos.load();
 let x = position.x;
 let y = position.y;
@@ -121,6 +116,8 @@ let z = position.z;
 // Get player's world
 let world = player.living_entity.entity.world.clone();
 ```
+
+> **Note:** The chain `player.living_entity.entity.pos` reflects Pumpkin's entity hierarchy: a Player is a LivingEntity, which is an Entity. In Java, this is hidden behind `player.getLocation()`. In Rust, the structure is explicit, which makes it clearer what data you're accessing.
 
 #### Java Comparison
 

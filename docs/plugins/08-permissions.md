@@ -15,24 +15,20 @@ Pumpkin supports both:
 
 ## Operator Levels
 
-Minecraft's built-in permission levels:
+Minecraft has a built-in system of operator (OP) levels from 0 to 4. Each level grants progressively more server access:
 
-```rust
-pub enum PermissionLvl {
-    Zero  = 0, // Default player
-    One   = 1, // Bypass spawn protection
-    Two   = 2, // Command access (similar to /gamemode, /tp)
-    Three = 3, // Multiplayer management (/ban, /kick)
-    Four  = 4, // Server management (/stop, /save-all)
-}
-```
+- **Level 0** — Default player (no special permissions)
+- **Level 1** — Can bypass spawn protection
+- **Level 2** — Can use gameplay commands (`/gamemode`, `/tp`, etc.)
+- **Level 3** — Can use multiplayer management commands (`/ban`, `/kick`, etc.)
+- **Level 4** — Can use server management commands (`/stop`, `/save-all`, etc.)
 
 ### Checking Operator Level
 
 ```rust
-// In a command executor
+// In a command executor — check if the sender has OP level 2+
 if sender.has_permission_lvl(PermissionLvl::Two) {
-    // Has OP level 2+
+    // Has OP level 2 or higher
 }
 
 // On a player reference

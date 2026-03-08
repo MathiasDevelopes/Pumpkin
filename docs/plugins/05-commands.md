@@ -2,9 +2,9 @@
 
 ## The Command System
 
-Pumpkin uses a tree-based command system that's different from Bukkit's `onCommand()` approach. Instead of parsing arguments manually, you build a `CommandTree` that declaratively defines your command's structure, arguments, and execution logic.
+In Bukkit, you'd typically override `onCommand()` and manually parse the arguments from a `String[]` array. Pumpkin takes a different approach: you build a **command tree** that describes your command's structure upfront, and the server handles argument parsing, validation, and tab completion for you.
 
-### Java vs Pumpkin Command Comparison
+### Java vs Pumpkin: At a Glance
 
 ```java
 // Java (Bukkit) — manual argument parsing
@@ -29,13 +29,7 @@ public class HealCommand implements CommandExecutor {
 ```
 
 ```rust
-// Rust (Pumpkin) — declarative tree builder
-use pumpkin::command::CommandExecutor;
-use pumpkin::command::args::ConsumedArgs;
-use pumpkin::command::tree::CommandTree;
-use pumpkin::command::tree::builder::argument;
-use pumpkin::command::args::players::PlayersArgumentConsumer;
-
+// Rust (Pumpkin) — declare the structure, then define the behavior
 pub fn init_command_tree() -> CommandTree {
     CommandTree::new(["heal"], "Heal yourself or another player")
         .then(
@@ -49,19 +43,21 @@ pub fn init_command_tree() -> CommandTree {
 }
 ```
 
+The tree approach means Pumpkin automatically knows what arguments are valid, can generate tab completions, and shows proper usage messages when commands are used incorrectly. No manual parsing needed.
+
 ---
 
-## Building a `CommandTree`
+## Building a Command Tree
 
-The `CommandTree` builder API has four node types:
+The command tree builder has a few simple building blocks:
 
-### 1. **Literal Nodes** — Fixed text arguments
+### Literal Nodes — Fixed text
+
+These are subcommands — exact words the player types:
 
 ```rust
-use pumpkin::command::tree::builder::literal;
-
-// /mycommand reload
-// /mycommand status
+// Creates: /mycommand reload
+//          /mycommand status
 CommandTree::new(["mycommand"], "My custom command")
     .then(literal("reload").execute(ReloadExecutor))
     .then(literal("status").execute(StatusExecutor))
@@ -70,28 +66,28 @@ CommandTree::new(["mycommand"], "My custom command")
 #### Java Comparison
 
 ```java
-// Java — manual string matching
+// Java — you'd manually check args[0]
 if (args[0].equalsIgnoreCase("reload")) { ... }
 else if (args[0].equalsIgnoreCase("status")) { ... }
 ```
 
-### 2. **Argument Nodes** — Dynamic typed arguments
+### Argument Nodes — Dynamic typed values
+
+These accept player input and parse it into the right type:
 
 ```rust
-use pumpkin::command::tree::builder::argument;
-use pumpkin::command::args::players::PlayersArgumentConsumer;
-
-// /tp <target>
+// Creates: /tp <target>
+// The PlayersArgumentConsumer automatically handles player names and selectors (@a, @p)
 CommandTree::new(["tp"], "Teleport to a player")
     .then(argument("target", PlayersArgumentConsumer).execute(TpExecutor))
 ```
 
-### 3. **Require Nodes** — Permission/condition gates
+### Require Nodes — Permission/condition gates
+
+These add conditions that must be true before the command continues:
 
 ```rust
-use pumpkin::command::tree::builder::require;
-
-// Only players can use this command
+// Only players can use this command (not console, not command blocks)
 CommandTree::new(["fly"], "Toggle flight")
     .then(
         require(|sender| sender.is_player())
@@ -99,75 +95,101 @@ CommandTree::new(["fly"], "Toggle flight")
     )
 ```
 
-### 4. **Execute Leaves** — Terminal actions
+### Execute — The action itself
+
+This is where your actual command logic goes. You can execute at the root level (no arguments) or at any point in the tree:
 
 ```rust
-// Execute at the root level (no arguments needed)
+// No arguments needed — just run the command
 CommandTree::new(["ping"], "Check server latency")
     .execute(PingExecutor)
 ```
 
 ---
 
-## The `CommandExecutor` Trait
+## Writing Command Executors
 
-Every command action implements this trait:
+Each command action is a struct that implements `CommandExecutor`. The execute method receives the sender, the server, and any parsed arguments:
 
 ```rust
-pub trait CommandExecutor: Sync + Send {
+struct PingExecutor;
+
+impl CommandExecutor for PingExecutor {
     fn execute<'a>(
         &'a self,
         sender: &'a CommandSender,
-        server: &'a Server,
-        args: &'a ConsumedArgs<'a>,
-    ) -> CommandResult<'a>;
+        _server: &'a pumpkin::server::Server,
+        _args: &'a ConsumedArgs<'a>,
+    ) -> pumpkin::command::CommandResult<'a> {
+        Box::pin(async move {
+            sender.send_message(TextComponent::text("§aPong!")).await;
+            Ok(1)  // Return 1 for success
+        })
+    }
 }
-
-// CommandResult is a pinned future returning Result<i32, CommandError>
-pub type CommandResult<'a> = Pin<Box<
-    dyn Future<Output = Result<i32, CommandError>> + Send + 'a
->>;
 ```
 
-The return value `i32` is the "success count" — similar to Minecraft's command success count used by command blocks. Return `1` for success, `0` for no-op.
+> **About the return value:** `Ok(1)` means "success" (the command did something). `Ok(0)` means "no-op" (nothing happened). This is used by command blocks in Minecraft to determine if a command succeeded.
+
+### Checking the Sender Type
+
+Commands can come from players, the console, command blocks, or RCON. You can check who sent it:
+
+```rust
+// Check if the sender is a player
+if let Some(player) = sender.as_player() {
+    // 'player' is the Player object
+}
+
+// Check type without getting the player
+sender.is_player();   // true if a player
+sender.is_console();  // true if the console
+
+// Send a message to any sender type
+sender.send_message(TextComponent::text("Hello!")).await;
+
+// Check permissions
+sender.has_permission_lvl(PermissionLvl::Two);
+```
 
 ---
 
 ## Argument Types
 
-Pumpkin provides many built-in argument consumers:
+Pumpkin provides built-in argument parsers for common types:
 
-| Consumer | Parses | Result `Arg` Variant |
-|----------|--------|----------------------|
-| `PlayersArgumentConsumer` | Player selector (`@a`, `@p`, name) | `Arg::Players(Vec<Arc<Player>>)` |
-| `MsgArgConsumer` | Chat message (rest of input) | `Arg::Msg(String)` |
-| `GamemodeArgumentConsumer` | Gamemode name/number | `Arg::GameMode(GameMode)` |
-| `BlockPosArgumentConsumer` | Block coordinates (`x y z`) | `Arg::BlockPos(BlockPos)` |
-| `Position3DArgumentConsumer` | 3D position (decimal) | `Arg::Pos3D(Vector3<f64>)` |
-| `BoolArgumentConsumer` | `true`/`false` | `Arg::Bool(bool)` |
-| `BoundedNumArgumentConsumer` | Numbers with range | `Arg::Num(Result<Number, NotInBounds>)` |
-| `SimpleArgConsumer` | Raw string token | `Arg::Simple(&str)` |
-| `ResourceLocationConsumer` | `namespace:path` | `Arg::ResourceLocation(&str)` |
-| `ItemArgumentConsumer` | Item type | `Arg::Item(&str)` |
-| `TimeArgumentConsumer` | Time value (`1d`, `5s`) | `Arg::Time(i32)` |
+| Argument Consumer | What It Parses | Example Input |
+|-------------------|---------------|---------------|
+| `PlayersArgumentConsumer` | Player names/selectors | `Steve`, `@a`, `@p` |
+| `MsgArgConsumer` | Rest of input as a message | `Hello world!` |
+| `GamemodeArgumentConsumer` | Gamemode | `creative`, `survival` |
+| `BlockPosArgumentConsumer` | Block coordinates | `100 64 200` |
+| `Position3DArgumentConsumer` | Decimal coordinates | `100.5 64.0 200.5` |
+| `BoolArgumentConsumer` | Boolean | `true`, `false` |
+| `BoundedNumArgumentConsumer` | Number with range | `42` |
+| `SimpleArgConsumer` | Raw text token | `my_warp_name` |
+| `ItemArgumentConsumer` | Item type | `diamond_sword` |
+| `TimeArgumentConsumer` | Time duration | `1d`, `5s`, `30t` |
 
 ### Extracting Arguments
+
+When your executor runs, arguments have already been parsed. You extract them by name:
 
 ```rust
 impl CommandExecutor for MyExecutor {
     fn execute<'a>(
         &'a self,
         sender: &'a CommandSender,
-        server: &'a Server,
+        _server: &'a pumpkin::server::Server,
         args: &'a ConsumedArgs<'a>,
-    ) -> CommandResult<'a> {
+    ) -> pumpkin::command::CommandResult<'a> {
         Box::pin(async move {
-            // Extract a player argument
+            // Get a player argument by name
             let Some(Arg::Players(targets)) = args.get("target") else {
                 return Err(CommandError::InvalidConsumption(Some("target".into())));
             };
 
-            // Extract a message argument
+            // Get a message argument
             let Some(Arg::Msg(message)) = args.get("message") else {
                 return Err(CommandError::InvalidConsumption(Some("message".into())));
             };
@@ -185,41 +207,7 @@ impl CommandExecutor for MyExecutor {
 }
 ```
 
----
-
-## The `CommandSender`
-
-The sender can be a player, console, command block, or RCON:
-
-```rust
-pub enum CommandSender {
-    Rcon(Arc<tokio::sync::Mutex<Vec<String>>>),
-    Console,
-    Player(Arc<Player>),
-    CommandBlock(Arc<CommandBlockEntity>, Arc<World>),
-    Dummy,
-}
-```
-
-### Useful `CommandSender` Methods
-
-```rust
-// Check sender type
-sender.is_player();    // true if Player variant
-sender.is_console();   // true if Console variant
-
-// Get player (returns None for non-player senders)
-if let Some(player) = sender.as_player() {
-    // Use player...
-}
-
-// Send a message to the sender (works for all types)
-sender.send_message(TextComponent::text("Hello!")).await;
-
-// Check permissions
-sender.has_permission_lvl(PermissionLvl::Two); // op level check
-sender.has_permission(server, "my.permission").await; // custom permission
-```
+> **Rust tip:** The `let Some(...) = ... else { return ... }` pattern is called a "let-else" statement. It's like an if-null-return check in Java: if the argument isn't found, return an error; otherwise, extract the value and continue.
 
 ---
 
@@ -227,13 +215,9 @@ sender.has_permission(server, "my.permission").await; // custom permission
 
 ### Example 1: Simple `/ping` Command
 
-```rust
-use std::sync::Arc;
-use pumpkin::command::{CommandExecutor, CommandSender, CommandError};
-use pumpkin::command::args::ConsumedArgs;
-use pumpkin::command::tree::CommandTree;
-use pumpkin_util::text::TextComponent;
+The simplest possible command — no arguments, just a response:
 
+```rust
 struct PingExecutor;
 
 impl CommandExecutor for PingExecutor {
@@ -268,14 +252,11 @@ public boolean onCommand(CommandSender sender, Command cmd, String label, String
 }
 ```
 
-### Example 2: `/msg <player> <message>` Command
+### Example 2: `/msg <player> <message>`
+
+A command with two arguments — a target player and a message:
 
 ```rust
-use pumpkin::command::args::players::PlayersArgumentConsumer;
-use pumpkin::command::args::message::MsgArgConsumer;
-use pumpkin::command::args::Arg;
-use pumpkin::command::tree::builder::argument;
-
 struct MsgExecutor;
 
 impl CommandExecutor for MsgExecutor {
@@ -317,12 +298,13 @@ pub fn init_command_tree() -> CommandTree {
 }
 ```
 
-### Example 3: `/warp <set|tp> <name>` — Subcommands with Literals
+> **Tip:** `CommandTree::new(["msg", "whisper", "w"], ...)` registers the command under multiple names — so `/msg`, `/whisper`, and `/w` all work. This is like registering aliases in `plugin.yml`.
+
+### Example 3: `/warp <set|tp|list>` — Subcommands
+
+A command with subcommands using literal nodes:
 
 ```rust
-use pumpkin::command::args::simple::SimpleArgConsumer;
-use pumpkin::command::tree::builder::{literal, argument, require};
-
 struct WarpSetExecutor;
 struct WarpTpExecutor;
 struct WarpListExecutor;
@@ -339,15 +321,10 @@ impl CommandExecutor for WarpSetExecutor {
                 return Err(CommandError::InvalidConsumption(Some("name".into())));
             };
 
-            let Some(player) = sender.as_player() else {
-                return Err(CommandError::InvalidRequirement);
-            };
-
             // Save warp location (you'd store this in your plugin state)
             sender.send_message(
                 TextComponent::text(format!("§aWarp '{name}' has been set!"))
             ).await;
-
             Ok(1)
         })
     }
@@ -365,11 +342,9 @@ impl CommandExecutor for WarpTpExecutor {
                 return Err(CommandError::InvalidConsumption(Some("name".into())));
             };
 
-            // Look up and teleport to warp (from your plugin state)
             sender.send_message(
                 TextComponent::text(format!("§aTeleported to warp '{name}'!"))
             ).await;
-
             Ok(1)
         })
     }
@@ -415,12 +390,14 @@ pub fn init_command_tree() -> CommandTree {
 // This creates:
 //   /warp set <name>   — Players only
 //   /warp tp <name>    — Players only
-//   /warp list         — Anyone
+//   /warp list         — Anyone (console, players, etc.)
 ```
 
 ---
 
-## Registering Commands in Your Plugin
+## Registering and Unregistering Commands
+
+### Registering
 
 ```rust
 #[plugin_method]
@@ -436,7 +413,7 @@ pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
 }
 ```
 
-### Unregistering Commands
+### Unregistering
 
 ```rust
 #[plugin_method]
@@ -449,41 +426,24 @@ pub fn on_unload(&mut self, server: Arc<Context>) -> Result<(), String> {
 
 ---
 
-## Error Handling
+## Error Handling in Commands
 
-Commands use `CommandError` for error reporting:
-
-```rust
-pub enum CommandError {
-    InvalidConsumption(Option<String>), // Argument parsing failed
-    InvalidRequirement,                 // require() predicate failed
-    PermissionDenied,                   // No permission
-    CommandFailed(TextComponent),       // Custom error message
-}
-```
-
-### Returning Custom Error Messages
+If something goes wrong in your command, you can return different types of errors:
 
 ```rust
-impl CommandExecutor for MyExecutor {
-    fn execute<'a>(
-        &'a self,
-        sender: &'a CommandSender,
-        _server: &'a pumpkin::server::Server,
-        _args: &'a ConsumedArgs<'a>,
-    ) -> pumpkin::command::CommandResult<'a> {
-        Box::pin(async move {
-            let Some(player) = sender.as_player() else {
-                return Err(CommandError::CommandFailed(
-                    TextComponent::text("§cThis command can only be used by players!")
-                ));
-            };
+// Argument not found or invalid
+return Err(CommandError::InvalidConsumption(Some("target".into())));
 
-            // Command logic...
-            Ok(1)
-        })
-    }
-}
+// A require() condition wasn't met
+return Err(CommandError::InvalidRequirement);
+
+// No permission
+return Err(CommandError::PermissionDenied);
+
+// Custom error with a message shown to the player
+return Err(CommandError::CommandFailed(
+    TextComponent::text("§cThis command can only be used by players!")
+));
 ```
 
 ---

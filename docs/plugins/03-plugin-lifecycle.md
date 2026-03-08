@@ -1,26 +1,22 @@
 # Stage 3: Plugin Lifecycle
 
-## The `Plugin` Trait
+## How Plugins Start and Stop
 
-At the core of every Pumpkin plugin is the `Plugin` trait. If you've worked with Bukkit, think of it as the equivalent of extending `JavaPlugin`:
+Every Pumpkin plugin has a simple lifecycle, very similar to Bukkit:
 
-```rust
-pub trait Plugin: Send + Sync + 'static {
-    fn on_load(&mut self, server: Arc<Context>) -> PluginFuture<'_, Result<(), String>>;
-    fn on_unload(&mut self, server: Arc<Context>) -> PluginFuture<'_, Result<(), String>>;
-}
-```
+1. **`on_load`** — Called when your plugin starts (like `onEnable()` in Bukkit)
+2. **Running** — Your plugin responds to events and commands
+3. **`on_unload`** — Called when the server stops or your plugin is unloaded (like `onDisable()`)
 
-Both methods have default implementations that return `Ok(())`, so you only need to override what you actually use.
+Both methods receive a `Context` object — your plugin's gateway to the server. Think of it as a combination of `this.getServer()` and `this` from Bukkit, all in one.
 
 ### Java Comparison
 
-| Java (`JavaPlugin`) | Pumpkin (`Plugin` trait) |
-|---------------------|--------------------------|
-| `onLoad()` | — (no equivalent, metadata is static) |
-| `onEnable()` | `on_load(&mut self, server: Arc<Context>)` |
-| `onDisable()` | `on_unload(&mut self, server: Arc<Context>)` |
-| `getServer()` | `server.server` (via `Context`) |
+| Java (`JavaPlugin`) | Pumpkin |
+|---------------------|---------|
+| `onEnable()` | `on_load(server)` |
+| `onDisable()` | `on_unload(server)` |
+| `getServer()` | `server.server` |
 | `getDataFolder()` | `server.get_data_folder()` |
 | `getLogger()` | `server.log(...)` |
 
@@ -28,50 +24,38 @@ Both methods have default implementations that return `Ok(())`, so you only need
 
 ## Plugin Loading Sequence
 
-When the Pumpkin server starts, plugins go through these stages:
+When the Pumpkin server starts, here's what happens with your plugin:
 
 ```
-1. Discovery    → Server scans the plugins/ directory
-2. Validation   → API version check (PUMPKIN_API_VERSION)
-3. Loading      → Dynamic library loaded, metadata extracted
-4. Initialization → plugin() factory function called
-5. on_load()    → Your plugin receives the Context
-6. Running      → Plugin responds to events and commands
-7. on_unload()  → Server shuts down or plugin is manually unloaded
-8. Cleanup      → Library unloaded (except on Windows)
+1. Discovery      → Server scans the plugins/ directory for library files
+2. Validation     → Checks that your plugin was built for the current API version
+3. Loading        → Opens your library and reads its metadata
+4. Initialization → Creates an instance of your plugin struct
+5. on_load()      → Your code runs — register events, commands, etc.
+6. Running        → Your plugin responds to game events
+7. on_unload()    → Server shuts down or plugin is manually unloaded
+8. Cleanup        → Library is closed
 ```
 
-### Plugin States
-
-Plugins can be in one of these states:
-
-```rust
-pub enum PluginState {
-    Loading,          // Plugin is being loaded
-    Loaded,           // Successfully loaded and running
-    Failed(String),   // Failed to load (with error message)
-}
-```
+If your plugin fails to load (compilation error, API mismatch, etc.), the server continues running without it and logs the error.
 
 ---
 
-## The `Context` API
+## The Context: Your Server Connection
 
-The `Context` struct is your plugin's gateway to the server. It's passed to `on_load` and provides access to everything you need:
+The `Context` object is passed to your `on_load` and `on_unload` methods. It provides everything you need to interact with the server:
 
-```rust
-pub struct Context {
-    pub server: Arc<Server>,                              // The server instance
-    pub handlers: Arc<RwLock<HandlerMap>>,                 // Event handler registry
-    pub plugin_manager: Arc<PluginManager>,                // Plugin management
-    pub permission_manager: Arc<RwLock<PermissionManager>>,// Permission system
-    pub logger: Arc<OnceLock<LoggerOption>>,               // Logging
-}
-```
+- **`server.log("message")`** — Log a message (auto-prefixed with your plugin name)
+- **`server.get_data_folder()`** — Get your plugin's data directory
+- **`server.get_player_by_name("Steve")`** — Find an online player
+- **`server.register_event(...)`** — Listen for game events
+- **`server.register_command(...)`** — Add a custom command
+- **`server.register_permission(...)`** — Register a permission node
+- **`server.server`** — Access the underlying server instance for advanced operations
 
 ### Storing the Context
 
-Since `on_load` is the only place you receive the `Context`, you'll typically store it for later use:
+In Bukkit, you always have access to the server through `this` (your plugin instance). In Pumpkin, the `Context` is given to you in `on_load`, so you'll want to save it if you need it later:
 
 ```rust
 #[plugin_impl]
@@ -89,17 +73,19 @@ impl MyPlugin {
 
     #[plugin_method]
     pub fn on_unload(&mut self, server: Arc<Context>) -> Result<(), String> {
-        self.context = None;
+        self.context = None;  // Clean up the reference
         server.log("Plugin unloaded!");
         Ok(())
     }
 }
 ```
 
+> **New to Rust?** The `Option<Arc<Context>>` means "this might or might not hold a Context." `Option` is Rust's way of saying "this could be empty" — like a nullable field in Java, but the compiler forces you to check before using it. `Arc` means it's a shared reference that's safe to use across threads.
+
 #### Java Comparison
 
 ```java
-// Java — the instance is always available via 'this'
+// Java — the server is always available through 'this'
 public class MyPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
@@ -108,11 +94,11 @@ public class MyPlugin extends JavaPlugin {
 }
 ```
 
-In Pumpkin, you don't have implicit access to the server — you receive it explicitly through the `Context`. This is a Rust pattern: explicit is better than implicit.
+In Pumpkin, you receive the Context explicitly. This is a common Rust pattern: being explicit about what you have access to, rather than relying on hidden global state.
 
 ---
 
-## Core Context Methods
+## What You Can Do with Context
 
 ### Data Folder
 
@@ -120,7 +106,7 @@ In Pumpkin, you don't have implicit access to the server — you receive it expl
 // Creates plugins/my-plugin/ if it doesn't exist and returns the path
 let data_folder = server.get_data_folder();
 
-// Save a config file
+// Save a config file to your plugin's folder
 let config_path = data_folder.join("config.toml");
 std::fs::write(&config_path, "setting = true").map_err(|e| e.to_string())?;
 ```
@@ -144,24 +130,25 @@ if (player != null) {
 }
 ```
 
-### Registering Events
+Notice how similar these are! The main difference is `if let Some(player)` instead of `if (player != null)` — Rust uses `Option` instead of null.
+
+### Registering Events (Preview)
 
 ```rust
-use pumpkin::plugin::api::events::player::PlayerJoinEvent;
-use pumpkin::plugin::EventHandler;
-
+// Register a handler for player join events
 server.register_event::<PlayerJoinEvent, _>(
     Arc::new(MyJoinHandler),
     EventPriority::Normal,
-    false, // non-blocking (read-only access)
+    false,  // non-blocking (read-only)
 ).await;
 ```
 
 We'll cover events in detail in [Stage 4](04-events.md).
 
-### Registering Commands
+### Registering Commands (Preview)
 
 ```rust
+// Register a custom command with a permission requirement
 server.register_command(my_command_tree(), "my.command.permission").await;
 ```
 
@@ -171,7 +158,7 @@ We'll cover commands in detail in [Stage 5](05-commands.md).
 
 ## Managing Plugin State
 
-Pumpkin plugins can hold mutable state in their struct fields. Since Rust enforces thread safety at compile time, you'll use standard synchronization primitives:
+Your plugin struct can hold data, just like fields in a Java class. Here's a plugin that tracks player statistics:
 
 ```rust
 use std::collections::HashMap;
@@ -195,21 +182,23 @@ impl StatsPlugin {
 }
 ```
 
+> **New to Rust?** The `Arc<RwLock<HashMap<String, u32>>>` might look intimidating, but here's what each layer does:
+> - `HashMap<String, u32>` — A map from player names to kill counts (like Java's `HashMap`)
+> - `RwLock<...>` — Allows multiple readers OR one writer at a time (like Java's `ReadWriteLock`)
+> - `Arc<...>` — Lets you share this data safely between your plugin and its event handlers
+>
+> Together, they're the Rust equivalent of Java's `ConcurrentHashMap` — but with compile-time guarantees that you'll never have a data race.
+
 ### Java Comparison
 
 ```java
 // Java — thread safety is your responsibility
 public class StatsPlugin extends JavaPlugin {
     private final ConcurrentHashMap<String, Integer> playerKills = new ConcurrentHashMap<>();
-
-    @Override
-    public void onEnable() {
-        // No compile-time thread safety guarantees
-    }
 }
 ```
 
-In Rust, the compiler refuses to compile code that could have data races. The `Arc<RwLock<T>>` pattern is Pumpkin's equivalent of Java's `ConcurrentHashMap` or `synchronized` blocks — but enforced at compile time.
+In Java, choosing the wrong collection type (e.g., `HashMap` instead of `ConcurrentHashMap`) can cause hard-to-find bugs. In Rust, the compiler catches this for you — if you try to share a regular `HashMap` between threads, it won't compile.
 
 ---
 
@@ -231,7 +220,7 @@ pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
 }
 ```
 
-You can also check if a specific plugin is active:
+You can also check if a specific plugin is active without waiting:
 
 ```rust
 let is_active = server.plugin_manager.is_plugin_active("economy-plugin").await;
@@ -269,9 +258,9 @@ for (name, error) in &failed {
 
 ---
 
-## Complete Example: A Stateful Plugin
+## Complete Example: A Welcome Plugin
 
-Here's a complete example bringing everything together:
+Here's a complete plugin that counts how many times each player has joined:
 
 ```rust
 use std::sync::Arc;
@@ -291,6 +280,8 @@ pub struct WelcomePlugin {
     join_count: Arc<RwLock<HashMap<String, u32>>>,
 }
 
+// This struct handles the join event — we'll explain this pattern
+// in detail in Stage 4.
 struct JoinHandler {
     join_count: Arc<RwLock<HashMap<String, u32>>>,
 }
@@ -340,11 +331,13 @@ impl WelcomePlugin {
 }
 ```
 
+Don't worry if the event handler syntax looks complex — we'll break it down step by step in the next chapter!
+
 ---
 
 ## What's Next?
 
-In [Stage 4: Events](04-events.md), we'll take a deep dive into Pumpkin's event system — how to listen for events, modify them, cancel them, and understand handler priorities.
+In [Stage 4: Events](04-events.md), we'll learn how to listen for game events — player joins, chat messages, block breaks, and more. This is where plugins really come to life!
 
 ---
 
