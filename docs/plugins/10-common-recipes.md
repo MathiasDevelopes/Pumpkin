@@ -359,7 +359,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
-use pumpkin::command::{CommandExecutor, CommandSender, CommandError};
+use pumpkin::command::{CommandExecutor, CommandSender};
+use pumpkin::command::dispatcher::CommandError;
 use pumpkin::command::args::ConsumedArgs;
 use pumpkin_util::text::TextComponent;
 
