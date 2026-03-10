@@ -357,7 +357,9 @@ impl EventHandler<BlockBreakEvent> for BreakProtection {
     ) -> futures::future::BoxFuture<'a, ()> {
         Box::pin(async move {
             if is_near_spawn(&event.block_position) {
-                if let Some(player) = &event.player {
+                // Clone the player reference before mutating the event
+                let player = event.player.clone();
+                if let Some(player) = player {
                     // Allow OPs to break blocks
                     if player.permission_lvl.load() < pumpkin_util::PermissionLvl::Two {
                         event.set_cancelled(true);
@@ -381,9 +383,10 @@ impl EventHandler<BlockPlaceEvent> for PlaceProtection {
     ) -> futures::future::BoxFuture<'a, ()> {
         Box::pin(async move {
             if is_near_spawn(&event.block_position) {
-                if event.player.permission_lvl.load() < pumpkin_util::PermissionLvl::Two {
+                let player = event.player.clone();
+                if player.permission_lvl.load() < pumpkin_util::PermissionLvl::Two {
                     event.set_cancelled(true);
-                    event.player.send_system_message(
+                    player.send_system_message(
                         &pumpkin_util::text::TextComponent::text(
                             "§cYou cannot place blocks near spawn!"
                         )
@@ -398,6 +401,10 @@ impl EventHandler<BlockPlaceEvent> for PlaceProtection {
 pub struct SpawnProtectionPlugin;
 
 impl SpawnProtectionPlugin {
+    pub fn new() -> Self {
+        Self
+    }
+
     #[plugin_method]
     pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
         server.register_event::<BlockBreakEvent, _>(

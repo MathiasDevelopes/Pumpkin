@@ -67,6 +67,7 @@ crate-type = ["cdylib"]  # Compile as a native library the server can load
 pumpkin = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin" }            # Core server API
 pumpkin-api-macros = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin-api-macros" } # Plugin macros
 pumpkin-util = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin-util" }       # Utility helpers (text, math, types)
+pumpkin-data = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin-data" }       # Game data constants (chat types, etc.)
 ```
 
 A few things to note:
@@ -75,6 +76,7 @@ A few things to note:
 - `crate-type = ["cdylib"]` tells Rust to compile your code into a dynamic library that Pumpkin can load at runtime, similar to how the JVM loads `.jar` files.
 - The `[dependencies]` section is like Maven dependencies — Cargo downloads and links them automatically. The `git = "..."` syntax tells Cargo to fetch the dependency directly from GitHub's latest master branch.
 - **`pumpkin-util`** provides helpful types you'll use constantly in plugin development: `TextComponent` for formatted messages, `GameMode`, `Difficulty`, `BlockPos`, `Vector3`, math helpers, and more.
+- **`pumpkin-data`** provides game data constants like chat type IDs used in broadcasting messages.
 
 #### Java Comparison
 

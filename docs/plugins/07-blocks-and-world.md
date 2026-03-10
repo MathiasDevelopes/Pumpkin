@@ -383,10 +383,12 @@ impl EventHandler<BlockPlaceEvent> for RestrictedBlocks {
     ) -> futures::future::BoxFuture<'a, ()> {
         Box::pin(async move {
             if self.banned_blocks.iter().any(|b| b == event.block_placed.name) {
+                let player = event.player.clone();
+                let block_name = event.block_placed.name;
                 event.set_cancelled(true);
-                event.player.send_system_message(
+                player.send_system_message(
                     &pumpkin_util::text::TextComponent::text(
-                        format!("§cYou cannot place {}!", event.block_placed.name)
+                        format!("§cYou cannot place {block_name}!")
                     )
                 ).await;
             }

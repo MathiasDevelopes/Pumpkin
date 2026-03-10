@@ -31,8 +31,8 @@ if sender.has_permission_lvl(PermissionLvl::Two) {
     // Has OP level 2 or higher
 }
 
-// On a player reference
-if player.has_permission_lvl(PermissionLvl::Three) {
+// On a player reference — compare the stored permission level
+if player.permission_lvl.load() >= PermissionLvl::Three {
     // Player is OP level 3+
 }
 ```
