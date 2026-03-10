@@ -307,10 +307,10 @@ int maxHomes = getConfig().getInt("max-homes", 3);
 
 ```toml
 [dependencies]
-pumpkin = { path = "../Pumpkin/pumpkin" }
-pumpkin-api-macros = { path = "../Pumpkin/pumpkin-api-macros" }
-pumpkin-util = { path = "../Pumpkin/pumpkin-util" }
-pumpkin-macros = { path = "../Pumpkin/pumpkin-macros" }
+pumpkin = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin" }
+pumpkin-api-macros = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin-api-macros" }
+pumpkin-util = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin-util" }
+pumpkin-macros = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin-macros" }
 
 # Third-party crates
 tokio = { version = "1", features = ["full"] }

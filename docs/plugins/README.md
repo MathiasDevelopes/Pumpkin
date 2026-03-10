@@ -2,7 +2,7 @@
 
 Welcome to the official Pumpkin Plugin Development Guide! 🎃
 
-This tutorial series is designed for Minecraft plugin developers — especially those coming from the Java ecosystem (Bukkit/Spigot/Paper) — who want to build plugins for the [Pumpkin](https://github.com/Snowiiii/Pumpkin) Minecraft server.
+This tutorial series is designed for Minecraft plugin developers — especially those coming from the Java ecosystem (Bukkit/Spigot/Paper) — who want to build plugins for the [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) Minecraft server.
 
 **New to Rust?** That's perfectly fine! This guide walks you through everything step by step, introducing Rust concepts as they come up and explaining how they relate to what you already know from Java. You don't need to be a Rust expert to get started — the Pumpkin macros handle much of the complexity for you.
 
@@ -37,7 +37,7 @@ Pumpkin is a high-performance Minecraft server written in Rust. Its plugin syste
 
 ## 🎃 Quick Links
 
-- [Pumpkin Repository](https://github.com/Snowiiii/Pumpkin)
+- [Pumpkin Repository](https://github.com/Pumpkin-MC/Pumpkin)
 - [Pumpkin Documentation](https://pumpkinmc.org/)
 - [Pumpkin Discord](https://discord.gg/pumpkinmc)
 - [The Rust Book](https://doc.rust-lang.org/book/) — Learn Rust from scratch

@@ -603,7 +603,7 @@ You now have the knowledge to build plugins ranging from simple utilities to com
 
 ### Resources
 
-- [Pumpkin Repository](https://github.com/Snowiiii/Pumpkin) — Source code and issues
+- [Pumpkin Repository](https://github.com/Pumpkin-MC/Pumpkin) — Source code and issues
 - [Pumpkin Documentation](https://pumpkinmc.org/) — Official docs
 - [Pumpkin Discord](https://discord.gg/pumpkinmc) — Community and support
 - [The Rust Book](https://doc.rust-lang.org/book/) — The official Rust tutorial (free)

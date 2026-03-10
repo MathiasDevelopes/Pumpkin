@@ -19,7 +19,7 @@
 
 3. **Clone and build the Pumpkin server** (needed for development):
    ```bash
-   git clone https://github.com/Snowiiii/Pumpkin.git
+   git clone https://github.com/Pumpkin-MC/Pumpkin.git
    cd Pumpkin
    cargo build --release
    ```
@@ -64,15 +64,17 @@ edition = "2024"
 crate-type = ["cdylib"]  # Compile as a native library the server can load
 
 [dependencies]
-pumpkin = { path = "../Pumpkin/pumpkin" }        # Core server API
-pumpkin-api-macros = { path = "../Pumpkin/pumpkin-api-macros" }  # Plugin macros
+pumpkin = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin" }            # Core server API
+pumpkin-api-macros = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin-api-macros" } # Plugin macros
+pumpkin-util = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin-util" }       # Utility helpers (text, math, types)
 ```
 
 A few things to note:
 
 - The `[package]` section is like your `plugin.yml` — it defines your plugin's name, version, and description. Pumpkin reads this metadata automatically.
 - `crate-type = ["cdylib"]` tells Rust to compile your code into a dynamic library that Pumpkin can load at runtime, similar to how the JVM loads `.jar` files.
-- The `[dependencies]` section is like Maven dependencies — Cargo downloads and links them automatically.
+- The `[dependencies]` section is like Maven dependencies — Cargo downloads and links them automatically. The `git = "..."` syntax tells Cargo to fetch the dependency directly from GitHub's latest master branch.
+- **`pumpkin-util`** provides helpful types you'll use constantly in plugin development: `TextComponent` for formatted messages, `GameMode`, `Difficulty`, `BlockPos`, `Vector3`, math helpers, and more.
 
 #### Java Comparison
 
@@ -222,6 +224,189 @@ pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
 getLogger().info("Plugin loaded successfully!");
 getLogger().info("Running version " + getDescription().getVersion());
 ```
+
+---
+
+## The `pumpkin-util` Crate — Your Utility Toolkit
+
+The `pumpkin-util` crate is a collection of helper types and functions that you'll use throughout your plugin development. Think of it as the Pumpkin equivalent of Apache Commons or Guava in the Java world — common building blocks that save you from reinventing the wheel.
+
+Here's a quick overview of what's inside:
+
+| Module | What It Provides | Java Equivalent |
+|--------|-----------------|-----------------|
+| `text::TextComponent` | Rich formatted messages (colors, bold, click events, hover tooltips) | `ChatComponent` / Adventure API |
+| `GameMode` | Survival, Creative, Adventure, Spectator enum | `GameMode` enum |
+| `Difficulty` | Peaceful, Easy, Normal, Hard enum | `Difficulty` enum |
+| `PermissionLvl` | Operator permission levels (0–4) | `isOp()` / permission levels |
+| `math::position::BlockPos` | Block coordinates (integer x, y, z) | `BlockPos` / `Location.toBlockLocation()` |
+| `math::vector3::Vector3` | 3D vectors (used for positions, velocities) | `Vector` class |
+| `math::experience` | XP calculation helpers (points to level, level to points) | Manual XP calculations |
+| `text::color` | Named colors, RGB colors, hex colors | `ChatColor` |
+| `text::click::ClickEvent` | Click actions (open URL, run command, copy to clipboard) | `ClickEvent` |
+| `text::hover::HoverEvent` | Hover tooltips (show text, show item) | `HoverEvent` |
+
+### TextComponent — Building Rich Messages
+
+`TextComponent` is the type you'll use most often. It builds the formatted messages that players see in chat, action bars, titles, and more:
+
+```rust
+use pumpkin_util::text::TextComponent;
+use pumpkin_util::text::color::NamedColor;
+
+// Simple text message
+let msg = TextComponent::text("Hello, world!");
+
+// Colored and styled text — uses builder pattern (chain method calls)
+let fancy = TextComponent::text("Welcome!")
+    .color_named(NamedColor::Gold)
+    .bold();
+
+// Combine multiple components with add_child
+let combined = TextComponent::text("Hello ")
+    .add_child(
+        TextComponent::text("Steve")
+            .color_named(NamedColor::Green)
+            .bold()
+    )
+    .add_child(TextComponent::text("!"));
+
+// Rainbow text!
+let rainbow = TextComponent::text("This is rainbow text!").rainbow();
+
+// Gradient text between colors
+let gradient = TextComponent::text("Smooth gradient")
+    .gradient(&[
+        pumpkin_util::text::color::RGBColor::new(255, 0, 0),
+        pumpkin_util::text::color::RGBColor::new(0, 0, 255),
+    ]);
+```
+
+#### Java Comparison
+
+```java
+// Java (Adventure API)
+Component msg = Component.text("Welcome!")
+    .color(NamedTextColor.GOLD)
+    .decorate(TextDecoration.BOLD);
+
+// Java (Legacy)
+String msg = ChatColor.GOLD + "" + ChatColor.BOLD + "Welcome!";
+```
+
+> **Rust tip:** The builder pattern used here (`.color_named(...).bold()`) works because each method returns `self`, so you can chain calls. This is the same idea as Java's builder pattern, but Rust calls it "method chaining."
+
+### Clickable and Hoverable Text
+
+You can make text interactive — just like Adventure API's click/hover events:
+
+```rust
+use pumpkin_util::text::TextComponent;
+use pumpkin_util::text::click::ClickEvent;
+use pumpkin_util::text::hover::HoverEvent;
+
+// Clickable link
+let link = TextComponent::text("§bClick here to visit our website!")
+    .click_event(ClickEvent::OpenUrl {
+        url: "https://pumpkinmc.org".into(),
+    });
+
+// Text that runs a command when clicked
+let cmd = TextComponent::text("§a[Click to Heal]")
+    .click_event(ClickEvent::RunCommand {
+        command: "/heal".into(),
+    });
+
+// Text with a hover tooltip
+let hover = TextComponent::text("§eHover over me!")
+    .hover_event(HoverEvent::show_text(
+        TextComponent::text("Secret tooltip text!")
+    ));
+```
+
+### GameMode and Difficulty
+
+Common enums for game state, directly usable in your plugin logic:
+
+```rust
+use pumpkin_util::GameMode;
+use pumpkin_util::Difficulty;
+
+// Check a player's game mode
+if player_gamemode == GameMode::Creative {
+    // Player is in creative mode
+}
+
+// Parse from a string (useful for commands)
+let mode: GameMode = "survival".parse().unwrap();
+let diff: Difficulty = "hard".parse().unwrap();
+
+// Display name
+let name = GameMode::Creative.to_str(); // "Creative"
+```
+
+### BlockPos and Vector3 — Working with Coordinates
+
+These types are used everywhere for positions and coordinates:
+
+```rust
+use pumpkin_util::math::position::BlockPos;
+use pumpkin_util::math::vector3::Vector3;
+
+// Create a block position
+let pos = BlockPos::new(100, 64, -200);
+
+// Iterate over all blocks in a region (like WorldEdit selections)
+for block_pos in BlockPos::iterate(
+    BlockPos::new(0, 60, 0),
+    BlockPos::new(10, 65, 10),
+) {
+    // Process each block position in the 11×6×11 area
+}
+
+// Convert between block positions and floating-point positions
+let float_pos: Vector3<f64> = pos.to_f64();
+let centered: Vector3<f64> = pos.to_centered_f64(); // Center of block (adds 0.5)
+
+// Create from floating-point (rounds down)
+let block = BlockPos::floored(100.7, 64.2, -200.9);
+// Result: BlockPos(100, 64, -201)
+
+// Get chunk coordinates from block position
+let chunk_pos = pos.chunk_position(); // Which chunk this block is in
+```
+
+#### Java Comparison
+
+```java
+// Java
+Location loc = new Location(world, 100, 64, -200);
+Block block = loc.getBlock();
+int chunkX = loc.getBlockX() >> 4;
+```
+
+### Experience Helpers
+
+Handy functions for XP calculations — no need to look up the formulas:
+
+```rust
+use pumpkin_util::math::experience;
+
+// How many XP points needed to progress within level 15?
+let points_needed = experience::points_in_level(15); // 37
+
+// Total XP points to reach level 30 from zero
+let total = experience::points_to_level(30); // 1395
+
+// Convert total XP to level + remaining points
+let (level, remaining) = experience::total_to_level_and_points(1000);
+// level = 26, remaining = some points into level 26
+
+// Calculate level progress bar (0.0 to 1.0)
+let progress = experience::progress_in_level(remaining, level);
+```
+
+We'll use these utilities throughout the tutorial — especially `TextComponent` in the events, commands, and player interaction stages.
 
 ---
 
