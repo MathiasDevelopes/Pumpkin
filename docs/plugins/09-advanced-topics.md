@@ -312,12 +312,16 @@ pumpkin-api-macros = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch
 pumpkin-util = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin-util" }
 pumpkin-data = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin-data" }
 pumpkin-macros = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin-macros" }
+log = "0.4"
 
 # Third-party crates
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 uuid = { version = "1", features = ["v4"] }
+
+[profile.release]
+lto = true
 ```
 
 ### Soft Dependencies (Optional Integrations)
