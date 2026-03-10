@@ -9,7 +9,7 @@ Pumpkin provides several block-related events for monitoring and controlling blo
 The `BlockBreakEvent` fires when a block is about to be broken:
 
 ```rust
-use pumpkin::plugin::api::events::block::BlockBreakEvent;
+use pumpkin::plugin::api::events::block::block_break::BlockBreakEvent;
 
 struct BreakHandler;
 
@@ -66,7 +66,7 @@ public void onBlockBreak(BlockBreakEvent event) {
 The `BlockPlaceEvent` fires when a block is about to be placed:
 
 ```rust
-use pumpkin::plugin::api::events::block::BlockPlaceEvent;
+use pumpkin::plugin::api::events::block::block_place::BlockPlaceEvent;
 
 struct PlaceHandler;
 
@@ -110,7 +110,7 @@ public void onBlockPlace(BlockPlaceEvent event) {
 Fires when a block is destroyed by fire:
 
 ```rust
-use pumpkin::plugin::api::events::block::BlockBurnEvent;
+use pumpkin::plugin::api::events::block::block_burn::BlockBurnEvent;
 
 struct BurnHandler;
 
@@ -133,7 +133,7 @@ impl EventHandler<BlockBurnEvent> for BurnHandler {
 Fires when a crop or tree grows:
 
 ```rust
-use pumpkin::plugin::api::events::block::BlockGrowEvent;
+use pumpkin::plugin::api::events::block::block_grow::BlockGrowEvent;
 
 struct GrowHandler;
 
@@ -144,7 +144,7 @@ impl EventHandler<BlockGrowEvent> for GrowHandler {
         event: &'a BlockGrowEvent,
     ) -> BoxFuture<'a, ()> {
         Box::pin(async move {
-            println!("Block grew at {:?}", event.block_position);
+            println!("Block grew at {:?}", event.block_pos);
         })
     }
 }
@@ -155,7 +155,7 @@ impl EventHandler<BlockGrowEvent> for GrowHandler {
 Fires when a block's redstone signal changes:
 
 ```rust
-use pumpkin::plugin::api::events::block::BlockRedstoneEvent;
+use pumpkin::plugin::api::events::block::block_redstone::BlockRedstoneEvent;
 
 struct RedstoneHandler;
 
@@ -168,7 +168,7 @@ impl EventHandler<BlockRedstoneEvent> for RedstoneHandler {
         Box::pin(async move {
             println!(
                 "Redstone changed at {:?}: {} -> {}",
-                event.block_position,
+                event.block_pos,
                 event.old_current,
                 event.new_current
             );
@@ -186,18 +186,19 @@ impl EventHandler<BlockRedstoneEvent> for RedstoneHandler {
 Fires when a chunk is loaded into memory:
 
 ```rust
-use pumpkin::plugin::api::events::world::ChunkLoadEvent;
+use pumpkin::plugin::api::events::world::chunk_load::ChunkLoad;
 
 struct ChunkLoadHandler;
 
-impl EventHandler<ChunkLoadEvent> for ChunkLoadHandler {
+impl EventHandler<ChunkLoad> for ChunkLoadHandler {
     fn handle<'a>(
         &'a self,
         _server: &'a Arc<Server>,
-        event: &'a ChunkLoadEvent,
+        event: &'a ChunkLoad,
     ) -> BoxFuture<'a, ()> {
         Box::pin(async move {
-            println!("Chunk loaded at ({}, {})", event.position.x, event.position.z);
+            // ChunkLoad provides access to the world and chunk data
+            println!("Chunk loaded in world");
         })
     }
 }
@@ -208,18 +209,19 @@ impl EventHandler<ChunkLoadEvent> for ChunkLoadHandler {
 Fires when a chunk is saved to disk:
 
 ```rust
-use pumpkin::plugin::api::events::world::ChunkSaveEvent;
+use pumpkin::plugin::api::events::world::chunk_save::ChunkSave;
 
 struct ChunkSaveHandler;
 
-impl EventHandler<ChunkSaveEvent> for ChunkSaveHandler {
+impl EventHandler<ChunkSave> for ChunkSaveHandler {
     fn handle<'a>(
         &'a self,
         _server: &'a Arc<Server>,
-        event: &'a ChunkSaveEvent,
+        event: &'a ChunkSave,
     ) -> BoxFuture<'a, ()> {
         Box::pin(async move {
-            println!("Chunk saved at ({}, {})", event.position.x, event.position.z);
+            // ChunkSave provides access to the world and chunk data
+            println!("Chunk saved");
         })
     }
 }
@@ -230,15 +232,15 @@ impl EventHandler<ChunkSaveEvent> for ChunkSaveHandler {
 Fires when chunk data is sent to a player (cancellable):
 
 ```rust
-use pumpkin::plugin::api::events::world::ChunkSendEvent;
+use pumpkin::plugin::api::events::world::chunk_send::ChunkSend;
 
 struct ChunkSendHandler;
 
-impl EventHandler<ChunkSendEvent> for ChunkSendHandler {
+impl EventHandler<ChunkSend> for ChunkSendHandler {
     fn handle_blocking<'a>(
         &'a self,
         _server: &'a Arc<Server>,
-        event: &'a mut ChunkSendEvent,
+        event: &'a mut ChunkSend,
     ) -> BoxFuture<'a, ()> {
         Box::pin(async move {
             // Prevent sending specific chunks (e.g., hidden areas)
@@ -253,7 +255,7 @@ impl EventHandler<ChunkSendEvent> for ChunkSendHandler {
 Fires when the world spawn point changes:
 
 ```rust
-use pumpkin::plugin::api::events::world::SpawnChangeEvent;
+use pumpkin::plugin::api::events::world::spawn_change::SpawnChangeEvent;
 
 struct SpawnHandler;
 
@@ -264,7 +266,7 @@ impl EventHandler<SpawnChangeEvent> for SpawnHandler {
         event: &'a SpawnChangeEvent,
     ) -> BoxFuture<'a, ()> {
         Box::pin(async move {
-            println!("World spawn changed to {:?}", event.new_spawn);
+            println!("World spawn changed to {:?}", event.new_position);
         })
     }
 }
@@ -284,7 +286,8 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use chrono::Local;
 
-use pumpkin::plugin::api::events::block::{BlockBreakEvent, BlockPlaceEvent};
+use pumpkin::plugin::api::events::block::block_break::BlockBreakEvent;
+use pumpkin::plugin::api::events::block::block_place::BlockPlaceEvent;
 use pumpkin::plugin::api::events::EventPriority;
 use pumpkin::plugin::EventHandler;
 use pumpkin::server::Server;

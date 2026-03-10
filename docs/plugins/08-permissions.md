@@ -9,7 +9,7 @@ Pumpkin has a permission system that combines Minecraft's operator levels with c
 Pumpkin supports both:
 
 1. **Operator Levels** (`PermissionLvl`) — The vanilla Minecraft permission system (levels 0–4)
-2. **Custom Permission Nodes** — String-based permissions like `myplugin.commands.heal`
+2. **Custom Permission Nodes** — String-based permissions like `myplugin:commands.heal`
 
 ---
 
@@ -69,29 +69,23 @@ For more granular control, Pumpkin supports custom permission nodes through the 
 Register your custom permissions during plugin load:
 
 ```rust
-use pumpkin_util::permission::Permission;
+use pumpkin_util::permission::{Permission, PermissionDefault};
 
 #[plugin_method]
 pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
     // Register a simple permission
-    server.register_permission(Permission {
-        name: "myplugin.admin".to_string(),
-        description: Some("Access admin features".to_string()),
-        default: false, // Not granted by default
-    }).await.map_err(|e| format!("Failed to register permission: {e}"))?;
+    server.register_permission(
+        Permission::new("myplugin:admin", "Access admin features", PermissionDefault::Deny)
+    ).await.map_err(|e| format!("Failed to register permission: {e}"))?;
 
     // Register command-specific permissions
-    server.register_permission(Permission {
-        name: "myplugin.commands.heal".to_string(),
-        description: Some("Allow using /heal command".to_string()),
-        default: false,
-    }).await.map_err(|e| format!("Failed to register permission: {e}"))?;
+    server.register_permission(
+        Permission::new("myplugin:commands.heal", "Allow using /heal command", PermissionDefault::Deny)
+    ).await.map_err(|e| format!("Failed to register permission: {e}"))?;
 
-    server.register_permission(Permission {
-        name: "myplugin.commands.warp".to_string(),
-        description: Some("Allow using /warp command".to_string()),
-        default: true, // Granted to everyone by default
-    }).await.map_err(|e| format!("Failed to register permission: {e}"))?;
+    server.register_permission(
+        Permission::new("myplugin:commands.warp", "Allow using /warp command", PermissionDefault::Allow)
+    ).await.map_err(|e| format!("Failed to register permission: {e}"))?;
 
     Ok(())
 }
@@ -119,11 +113,11 @@ permissions:
 // Check via the Context
 let has_perm = server.player_has_permission(
     &player.gameprofile.id,
-    "myplugin.admin"
+    "myplugin:admin"
 ).await;
 
 // In a CommandSender context
-let has_perm = sender.has_permission(server, "myplugin.commands.heal").await;
+let has_perm = sender.has_permission(server, "myplugin:commands.heal").await;
 ```
 
 ### In Command Registrations
@@ -134,7 +128,7 @@ When registering a command, you specify the required permission:
 // The second argument is the permission node required
 server.register_command(
     init_heal_tree(),
-    "myplugin.commands.heal",
+    "myplugin:commands.heal",
 ).await;
 ```
 
@@ -158,7 +152,7 @@ CommandTree::new(["admin"], "Admin commands")
 The `PlayerPermissionCheckEvent` fires whenever a permission is checked, allowing you to dynamically grant or deny permissions:
 
 ```rust
-use pumpkin::plugin::api::events::player::PlayerPermissionCheckEvent;
+use pumpkin::plugin::api::events::player::player_permission_check::PlayerPermissionCheckEvent;
 
 struct DynamicPermissions;
 
@@ -171,8 +165,8 @@ impl EventHandler<PlayerPermissionCheckEvent> for DynamicPermissions {
         Box::pin(async move {
             // Dynamically grant permissions based on custom logic
             // For example: VIP players get extra permissions
-            if is_vip(&event.player) && event.permission.starts_with("myplugin.vip.") {
-                event.set_has_permission(true);
+            if is_vip(&event.player) && event.permission.starts_with("myplugin:vip.") {
+                event.result = true;
             }
         })
     }
@@ -260,7 +254,7 @@ impl CommandExecutor for AdminCommandExecutor {
     ) -> pumpkin::command::CommandResult<'a> {
         Box::pin(async move {
             // Check custom permission
-            if !sender.has_permission(server, "myplugin.admin").await {
+            if !sender.has_permission(server, "myplugin:admin").await {
                 return Err(CommandError::PermissionDenied);
             }
 

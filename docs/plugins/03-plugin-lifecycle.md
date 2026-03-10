@@ -64,6 +64,10 @@ pub struct MyPlugin {
 }
 
 impl MyPlugin {
+    pub fn new() -> Self {
+        Self { context: None }
+    }
+
     #[plugin_method]
     pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
         self.context = Some(server.clone());
@@ -172,6 +176,13 @@ pub struct StatsPlugin {
 }
 
 impl StatsPlugin {
+    pub fn new() -> Self {
+        Self {
+            context: None,
+            player_kills: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
     #[plugin_method]
     pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
         self.context = Some(server.clone());
@@ -268,7 +279,7 @@ use std::collections::HashMap;
 use tokio::sync::RwLock;
 
 use pumpkin::plugin::api::context::Context;
-use pumpkin::plugin::api::events::player::PlayerJoinEvent;
+use pumpkin::plugin::api::events::player::player_join::PlayerJoinEvent;
 use pumpkin::plugin::api::events::EventPriority;
 use pumpkin::plugin::EventHandler;
 use pumpkin::server::Server;
@@ -302,6 +313,13 @@ impl EventHandler<PlayerJoinEvent> for JoinHandler {
 }
 
 impl WelcomePlugin {
+    pub fn new() -> Self {
+        Self {
+            context: None,
+            join_count: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
     #[plugin_method]
     pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
         self.context = Some(server.clone());

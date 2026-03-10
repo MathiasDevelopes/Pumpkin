@@ -96,7 +96,7 @@ Here's a conceptual example of a Lua plugin loader:
 
 ```rust
 use pumpkin::plugin::loader::{PluginLoader, PluginLoadFuture, PluginUnloadFuture, LoaderError};
-use pumpkin::plugin::api::mod::{Plugin, PluginMetadata};
+use pumpkin::plugin::{Plugin, PluginMetadata};
 
 struct LuaPluginLoader;
 

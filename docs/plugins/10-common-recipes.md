@@ -55,6 +55,12 @@ pub struct AnnouncerPlugin {
 }
 
 impl AnnouncerPlugin {
+    pub fn new() -> Self {
+        Self {
+            shutdown: Arc::new(Notify::new()),
+        }
+    }
+
     #[plugin_method]
     pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
         self.shutdown = Arc::new(Notify::new());
@@ -77,7 +83,7 @@ impl AnnouncerPlugin {
                         server_ref.broadcast_message(
                             &TextComponent::text(&messages[i]),
                             &TextComponent::text("Server"),
-                            pumpkin_util::text::SayCommand::Say,
+                            pumpkin_data::world::SAY_COMMAND,
                             None,
                         ).await;
                     }
@@ -127,7 +133,7 @@ use std::sync::Arc;
 use std::collections::HashSet;
 use tokio::sync::RwLock;
 
-use pumpkin::plugin::api::events::player::PlayerJoinEvent;
+use pumpkin::plugin::api::events::player::player_join::PlayerJoinEvent;
 use pumpkin::plugin::EventHandler;
 use pumpkin::server::Server;
 use pumpkin_util::text::TextComponent;
@@ -197,7 +203,9 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use tokio::sync::RwLock;
 
-use pumpkin::plugin::api::events::player::{PlayerMoveEvent, PlayerChatEvent, PlayerLeaveEvent};
+use pumpkin::plugin::api::events::player::player_move::PlayerMoveEvent;
+use pumpkin::plugin::api::events::player::player_chat::PlayerChatEvent;
+use pumpkin::plugin::api::events::player::player_leave::PlayerLeaveEvent;
 use pumpkin::plugin::api::events::EventPriority;
 use pumpkin::plugin::EventHandler;
 use pumpkin::server::Server;
@@ -229,7 +237,7 @@ impl EventHandler<PlayerMoveEvent> for MoveActivityHandler {
                 server.broadcast_message(
                     &TextComponent::text(format!("§7{name} is no longer AFK")),
                     &TextComponent::text("Server"),
-                    pumpkin_util::text::SayCommand::Say,
+                    pumpkin_data::world::SAY_COMMAND,
                     None,
                 ).await;
             }
@@ -470,7 +478,7 @@ use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 
 use pumpkin::plugin::api::context::Context;
-use pumpkin::plugin::api::events::player::PlayerJoinEvent;
+use pumpkin::plugin::api::events::player::player_join::PlayerJoinEvent;
 use pumpkin::plugin::api::events::EventPriority;
 use pumpkin::plugin::EventHandler;
 use pumpkin::server::Server;
@@ -525,6 +533,13 @@ impl EventHandler<PlayerJoinEvent> for JoinCountHandler {
 }
 
 impl JoinCounterPlugin {
+    pub fn new() -> Self {
+        Self {
+            context: None,
+            data: Arc::new(RwLock::new(JoinData::default())),
+        }
+    }
+
     #[plugin_method]
     pub fn on_load(&mut self, server: Arc<Context>) -> Result<(), String> {
         let data_folder = server.get_data_folder();
@@ -577,9 +592,9 @@ impl JoinCounterPlugin {
 | `player.getName()` | `player.gameprofile.name` |
 | `player.getUniqueId()` | `player.gameprofile.id` |
 | `player.getLocation()` | `player.living_entity.entity.pos.load()` |
-| `player.teleport(loc)` | `player.teleport(pos).await` |
+| `player.teleport(loc)` | `player.request_teleport(pos, yaw, pitch).await` |
 | `player.setGameMode(mode)` | `player.set_gamemode(mode).await` |
-| `player.kick(reason)` | `player.kick(text).await` |
+| `player.kick(reason)` | `player.kick(reason, text).await` |
 | `Bukkit.getPlayer(name)` | `server.get_player_by_name(name)` |
 | `Bukkit.getScheduler().runTask(...)` | `tokio::spawn(async { ... })` |
 | `plugin.yml` | `Cargo.toml` + `#[plugin_impl]` |

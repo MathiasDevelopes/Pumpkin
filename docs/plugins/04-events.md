@@ -222,12 +222,12 @@ Here's a reference of all events you can listen to:
 | `PlayerGamemodeChangeEvent` | ✅ | Player's gamemode changes |
 | `PlayerInteractEvent` | ✅ | Player interacts with a block |
 | `PlayerInteractEntityEvent` | ✅ | Player interacts with an entity |
-| `PlayerPermissionCheckEvent` | ✅ | Permission check occurs |
-| `PlayerChangeWorldEvent` | — | Player changes worlds |
+| `PlayerPermissionCheckEvent` | — | Permission check occurs |
+| `PlayerChangeWorldEvent` | ✅ | Player changes worlds |
 | `PlayerExpChangeEvent` | — | Player's experience changes |
 | `PlayerItemHeldEvent` | ✅ | Player changes held item slot |
 | `PlayerChangedMainHandEvent` | — | Player switches main hand |
-| `PlayerCustomPayloadEvent` | ✅ | Custom plugin channel message |
+| `PlayerCustomPayloadEvent` | — | Custom plugin channel message |
 | `EggThrowEvent` | — | Player throws an egg |
 | `PlayerFishEvent` | ✅ | Player fishes |
 
@@ -239,16 +239,16 @@ Here's a reference of all events you can listen to:
 | `BlockPlaceEvent` | ✅ | Block is placed |
 | `BlockBurnEvent` | ✅ | Block burns |
 | `BlockGrowEvent` | ✅ | Block grows (crops, trees) |
-| `BlockCanBuildEvent` | — | Check if block can be built at location |
-| `BlockRedstoneEvent` | — | Redstone signal changes |
+| `BlockCanBuildEvent` | ✅ | Check if block can be built at location |
+| `BlockRedstoneEvent` | ✅ | Redstone signal changes |
 
 ### World Events
 
 | Event | Cancellable | Description |
 |-------|:-----------:|-------------|
-| `ChunkLoadEvent` | — | Chunk is loaded |
-| `ChunkSaveEvent` | — | Chunk is saved |
-| `ChunkSendEvent` | ✅ | Chunk data sent to player |
+| `ChunkLoad` | ✅ | Chunk is loaded |
+| `ChunkSave` | ✅ | Chunk is saved |
+| `ChunkSend` | ✅ | Chunk data sent to player |
 | `SpawnChangeEvent` | — | World spawn point changes |
 
 ### Server Events
@@ -256,7 +256,7 @@ Here's a reference of all events you can listen to:
 | Event | Cancellable | Description |
 |-------|:-----------:|-------------|
 | `ServerCommandEvent` | ✅ | Console command is executed |
-| `ServerBroadcastEvent` | — | Server broadcasts a message |
+| `ServerBroadcastEvent` | ✅ | Server broadcasts a message |
 
 ---
 

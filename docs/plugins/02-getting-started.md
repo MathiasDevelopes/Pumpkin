@@ -108,6 +108,12 @@ use pumpkin_api_macros::{plugin_impl, plugin_method};
 pub struct MyFirstPlugin;
 
 impl MyFirstPlugin {
+    // Every plugin struct needs a new() constructor — the server calls
+    // this to create your plugin instance when it loads.
+    pub fn new() -> Self {
+        Self
+    }
+
     // #[plugin_method] marks this as a plugin lifecycle method.
     // on_load is called when the server starts — like onEnable() in Bukkit.
     #[plugin_method]
@@ -129,6 +135,7 @@ Let's break down the new Rust syntax:
 
 - **`use` statements** — Like Java `import` statements. They bring types into scope.
 - **`pub struct MyFirstPlugin;`** — Declares your plugin. A struct in Rust is similar to a Java class, but without inheritance. The `pub` makes it visible outside this file.
+- **`pub fn new() -> Self`** — A constructor that the server calls to create your plugin. Every plugin must have this. `Self` is shorthand for the struct's own type.
 - **`impl MyFirstPlugin`** — This is where you define methods on your struct, similar to writing methods inside a Java class body.
 - **`&mut self`** — This means the method can modify the plugin's data. In Java terms, it's like a regular instance method. (You'll learn more about `&self` vs `&mut self` later.)
 - **`Arc<Context>`** — The server context, passed to you on load. `Arc` means it's a shared reference that's safe to use across threads. Don't worry about the details — just use it like you'd use `this.getServer()` in Bukkit.

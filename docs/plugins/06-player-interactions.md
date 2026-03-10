@@ -57,8 +57,10 @@ player.sendMessage(Component.text("Hello!").color(NamedTextColor.GREEN));
 
 ```rust
 // Send a message to the action bar (above hotbar)
-player.send_actionbar_message(
-    &TextComponent::text("§6+5 Gold")
+use pumpkin::entity::player::TitleMode;
+player.show_title(
+    &TextComponent::text("§6+5 Gold"),
+    &TitleMode::ActionBar,
 ).await;
 ```
 
@@ -76,7 +78,7 @@ player.sendActionBar(Component.text("+5 Gold").color(NamedTextColor.GOLD));
 server.server.broadcast_message(
     &TextComponent::text("§eServer announcement!"),
     &TextComponent::text("Server"),
-    pumpkin_util::text::SayCommand::Say,
+    pumpkin_data::world::SAY_COMMAND,
     None,
 ).await;
 ```
@@ -161,7 +163,7 @@ use pumpkin_util::math::vector3::Vector3;
 
 // Teleport to coordinates
 let position = Vector3::new(100.0, 64.0, 200.0);
-player.teleport(position).await;
+player.request_teleport(position, 0.0, 0.0).await;
 ```
 
 #### Java Comparison
@@ -174,7 +176,7 @@ player.teleport(new Location(world, 100, 64, 200));
 ### Listening to Teleport Events
 
 ```rust
-use pumpkin::plugin::api::events::player::PlayerTeleportEvent;
+use pumpkin::plugin::api::events::player::player_teleport::PlayerTeleportEvent;
 
 struct TeleportHandler;
 
@@ -201,14 +203,19 @@ impl EventHandler<PlayerTeleportEvent> for TeleportHandler {
 ## Kicking Players
 
 ```rust
+use pumpkin::net::DisconnectReason;
 use pumpkin_util::text::TextComponent;
 
 // Kick with a reason
-player.kick(TextComponent::text("You have been kicked!")).await;
+player.kick(
+    DisconnectReason::Kicked,
+    TextComponent::text("You have been kicked!"),
+).await;
 
 // Kick with colored reason
 player.kick(
-    TextComponent::text("§cBanned: §fCheating is not allowed")
+    DisconnectReason::Kicked,
+    TextComponent::text("§cBanned: §fCheating is not allowed"),
 ).await;
 ```
 
@@ -323,7 +330,8 @@ use std::collections::HashSet;
 use tokio::sync::RwLock;
 
 use pumpkin::plugin::api::context::Context;
-use pumpkin::plugin::api::events::block::{BlockBreakEvent, BlockPlaceEvent};
+use pumpkin::plugin::api::events::block::block_break::BlockBreakEvent;
+use pumpkin::plugin::api::events::block::block_place::BlockPlaceEvent;
 use pumpkin::plugin::api::events::EventPriority;
 use pumpkin::plugin::EventHandler;
 use pumpkin::server::Server;
@@ -351,7 +359,7 @@ impl EventHandler<BlockBreakEvent> for BreakProtection {
             if is_near_spawn(&event.block_position) {
                 if let Some(player) = &event.player {
                     // Allow OPs to break blocks
-                    if !player.has_permission_lvl(pumpkin_util::PermissionLvl::Two) {
+                    if player.permission_lvl.load() < pumpkin_util::PermissionLvl::Two {
                         event.set_cancelled(true);
                         player.send_system_message(
                             &pumpkin_util::text::TextComponent::text(
@@ -373,7 +381,7 @@ impl EventHandler<BlockPlaceEvent> for PlaceProtection {
     ) -> futures::future::BoxFuture<'a, ()> {
         Box::pin(async move {
             if is_near_spawn(&event.block_position) {
-                if !event.player.has_permission_lvl(pumpkin_util::PermissionLvl::Two) {
+                if event.player.permission_lvl.load() < pumpkin_util::PermissionLvl::Two {
                     event.set_cancelled(true);
                     event.player.send_system_message(
                         &pumpkin_util::text::TextComponent::text(
