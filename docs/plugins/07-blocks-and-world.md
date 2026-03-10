@@ -197,8 +197,9 @@ impl EventHandler<ChunkLoad> for ChunkLoadHandler {
         event: &'a ChunkLoad,
     ) -> BoxFuture<'a, ()> {
         Box::pin(async move {
-            // ChunkLoad provides access to the world and chunk data
-            println!("Chunk loaded in world");
+            // Access chunk coordinates through the chunk data
+            let chunk = event.chunk.read().await;
+            println!("Chunk loaded at ({}, {})", chunk.x, chunk.z);
         })
     }
 }
@@ -220,8 +221,8 @@ impl EventHandler<ChunkSave> for ChunkSaveHandler {
         event: &'a ChunkSave,
     ) -> BoxFuture<'a, ()> {
         Box::pin(async move {
-            // ChunkSave provides access to the world and chunk data
-            println!("Chunk saved");
+            let chunk = event.chunk.read().await;
+            println!("Chunk saved at ({}, {})", chunk.x, chunk.z);
         })
     }
 }

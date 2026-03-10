@@ -64,6 +64,8 @@ if (player.hasPermission("minecraft.command.gamemode")) { ... }
 
 For more granular control, Pumpkin supports custom permission nodes through the `PermissionManager`.
 
+> **Note:** Pumpkin uses the `namespace:node` convention for permission nodes (e.g., `myplugin:commands.heal`) — similar to Minecraft's resource location format. The part before the colon is your plugin's namespace, and the part after is the specific permission.
+
 ### Registering Permissions
 
 Register your custom permissions during plugin load:

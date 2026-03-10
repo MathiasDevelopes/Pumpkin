@@ -56,7 +56,9 @@ player.sendMessage(Component.text("Hello!").color(NamedTextColor.GREEN));
 ### Action Bar Messages
 
 ```rust
-// Send a message to the action bar (above hotbar)
+// Send a message to the action bar (above hotbar).
+// In Pumpkin, action bar messages go through the title system — TitleMode::ActionBar
+// tells the server to display the text above the hotbar instead of as a title.
 use pumpkin::entity::player::TitleMode;
 player.show_title(
     &TextComponent::text("§6+5 Gold"),
@@ -161,9 +163,9 @@ GameMode mode = player.getGameMode();
 ```rust
 use pumpkin_util::math::vector3::Vector3;
 
-// Teleport to coordinates
+// Teleport to coordinates — yaw and pitch are in degrees (like Java)
 let position = Vector3::new(100.0, 64.0, 200.0);
-player.request_teleport(position, 0.0, 0.0).await;
+player.request_teleport(position, 0.0, 0.0).await; // (position, yaw, pitch)
 ```
 
 #### Java Comparison
@@ -361,6 +363,8 @@ impl EventHandler<BlockBreakEvent> for BreakProtection {
                 let player = event.player.clone();
                 if let Some(player) = player {
                     // Allow OPs to break blocks
+                    // permission_lvl is an atomic value — use .load() to read it safely
+                    // (Rust uses atomics for thread-safe shared state instead of Java's volatile)
                     if player.permission_lvl.load() < pumpkin_util::PermissionLvl::Two {
                         event.set_cancelled(true);
                         player.send_system_message(
