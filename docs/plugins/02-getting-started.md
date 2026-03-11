@@ -17,30 +17,6 @@
    cargo --version
    ```
 
-3. **Set up a development server** — you have two options:
-
-   **Option A: Build from source**
-   ```bash
-   git clone https://github.com/Pumpkin-MC/Pumpkin.git
-   cd Pumpkin
-   cargo build --release
-   ```
-
-   **Option B: Use Docker (recommended for quick setup)**
-
-   If you have Docker installed, you can skip compiling the server entirely and run a pre-built container:
-
-   ```bash
-   docker run --rm \
-       -p 25565:25565 \
-       -v ./data:/pumpkin \
-       -it ghcr.io/pumpkin-mc/pumpkin:master
-   ```
-
-   This pulls and runs the latest Pumpkin server directly. The `-v ./data:/pumpkin` flag mounts a local `data/` directory so your server files (including the `plugins/` folder) persist between runs.
-
-   > **Port conflict?** If you already have a Minecraft server running on port 25565, change the port mapping to use a different host port, e.g. `-p 25566:25565`. Then connect to `localhost:25566` in your Minecraft client.
-
 ### What is Cargo?
 
 If you've used Maven or Gradle in Java, **Cargo** is Rust's equivalent — but it does even more. It's your:
@@ -86,6 +62,7 @@ pumpkin-api-macros = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch
 pumpkin-util = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin-util" }       # Utility helpers (text, math, types)
 pumpkin-data = { git = "https://github.com/Pumpkin-MC/Pumpkin.git", branch = "master", package = "pumpkin-data" }       # Game data constants (chat types, etc.)
 log = "0.4"                                                                                                             # Logging facade
+tokio = { version = "1", features = ["full"] }                                                                          # Async runtime (required)
 
 [profile.release]
 lto = true  # Link-Time Optimization — produces a smaller and faster plugin binary
@@ -97,6 +74,7 @@ A few things to note:
 - `crate-type = ["cdylib"]` tells Rust to compile your code into a dynamic library that Pumpkin can load at runtime, similar to how the JVM loads `.jar` files.
 - The `[dependencies]` section is like Maven dependencies — Cargo downloads and links them automatically. The `git = "..."` syntax tells Cargo to fetch the dependency directly from GitHub's latest master branch.
 - **`log`** is the standard Rust logging facade — it provides macros like `info!()`, `warn!()`, and `error!()` that integrate with Pumpkin's logging system.
+- **`tokio`** is the async runtime that Pumpkin uses under the hood. It's required as a direct dependency because your plugin's async event handlers and commands run on the Tokio runtime.
 - **`pumpkin-util`** provides helpful types you'll use constantly in plugin development: `TextComponent` for formatted messages, `GameMode`, `Difficulty`, `BlockPos`, `Vector3`, math helpers, and more.
 - **`pumpkin-data`** provides game data constants like chat type IDs used in broadcasting messages.
 - **`[profile.release]`** with `lto = true` enables Link-Time Optimization for release builds, producing a smaller and faster plugin binary. Always recommended for production plugins.
@@ -181,9 +159,7 @@ Your compiled plugin will be at:
 
 ### Step 5: Install and Run
 
-Copy the compiled library to the Pumpkin server's `plugins/` directory:
-
-**If using a local build:**
+Copy the compiled library to the Pumpkin server's `plugins/` directory and start the server:
 
 ```bash
 # Linux example
@@ -194,21 +170,6 @@ cd /path/to/pumpkin-server
 cargo run --release
 ```
 
-**If using Docker:**
-
-```bash
-# Copy plugin into the mounted data directory
-cp target/release/libmy_first_plugin.so ./data/plugins/
-
-# Run the server (it picks up plugins from the mounted volume)
-docker run --rm \
-    -p 25565:25565 \
-    -v ./data:/pumpkin \
-    -it ghcr.io/pumpkin-mc/pumpkin:master
-```
-
-> **Port conflict?** If port 25565 is already in use by another Minecraft server, change the host port: `-p 25566:25565`. Then connect to `localhost:25566` in your client.
-
 You should see your plugin's message in the server console:
 
 ```
@@ -216,6 +177,52 @@ You should see your plugin's message in the server console:
 ```
 
 🎉 Congratulations — you've just built and loaded your first Pumpkin plugin!
+
+---
+
+## Setting Up a Development Server
+
+Before you can test your plugin, you need a running Pumpkin server. You have two options — pick whichever suits your workflow best.
+
+> ⚠️ **Important:** Set up the development server in a **separate directory** from your plugin project. Do not place it inside your plugin's folder.
+
+### Option A: Build from source
+
+```bash
+# Clone and build the server (do this outside your plugin directory)
+git clone https://github.com/Pumpkin-MC/Pumpkin.git
+cd Pumpkin
+cargo build --release
+```
+
+Then copy your plugin into the server's `plugins/` folder:
+
+```bash
+cp /path/to/my_first_plugin/target/release/libmy_first_plugin.so ./plugins/
+cargo run --release
+```
+
+### Option B: Use Docker (recommended for quick setup)
+
+If you have [Docker](https://docs.docker.com/get-docker/) installed, you can skip compiling the server entirely and run a pre-built container:
+
+```bash
+# Create a data directory for server files (including plugins)
+mkdir -p data/plugins
+
+# Copy your compiled plugin into it
+cp target/release/libmy_first_plugin.so ./data/plugins/
+
+# Run the Pumpkin server
+docker run --rm \
+    -p 25565:25565 \
+    -v ./data:/pumpkin \
+    -it ghcr.io/pumpkin-mc/pumpkin:master
+```
+
+The `-v ./data:/pumpkin` flag mounts your local `data/` directory into the container, so server files (configs, worlds, and the `plugins/` folder) persist between runs.
+
+> **Port conflict?** If you already have a Minecraft server running on port 25565, change the host port mapping, e.g. `-p 25566:25565`. Then connect to `localhost:25566` in your Minecraft client.
 
 ---
 
