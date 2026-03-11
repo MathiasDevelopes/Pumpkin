@@ -184,7 +184,7 @@ You should see your plugin's message in the server console:
 
 Before you can test your plugin, you need a running Pumpkin server. You have two options — pick whichever suits your workflow best.
 
-> ⚠️ **Important:** Set up the development server in a **separate directory** from your plugin project. Do not place it inside your plugin's folder.
+> ⚠️ **Important:** Set up the development server in a **separate directory** from your plugin project. Do not place it inside your plugin's directory.
 
 ### Option A: Build from source
 
